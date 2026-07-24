@@ -21,6 +21,7 @@ const getPortalTargetUrl = (role: PortalRole, path: string): string => {
   const host = window.location.hostname;
   const currentPort = window.location.port;
 
+  // Local development port routing
   if (host === "localhost" || host === "127.0.0.1") {
     if (role === "student" && currentPort !== "3000") return `http://${host}:3000${path}`;
     if (role === "faculty" && currentPort !== "3001") return `http://${host}:3001${path}`;
@@ -48,6 +49,7 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Sync inputs with selected role defaults for effortless testing
   useEffect(() => {
     const cred = CREDENTIALS[activeRole];
     setEmail(cred.email);
@@ -101,6 +103,7 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
     setError("");
     setLoading(true);
 
+    // Simulate backend verification
     await new Promise((resolve) => setTimeout(resolve, 600));
 
     if (email && password) {
@@ -117,6 +120,7 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row font-['Inter']">
+      {/* Left panel — Dynamic brand info based on active role */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-900 p-12 text-white">
         <div>
           <div className="flex items-center gap-2 mb-12">
@@ -167,6 +171,7 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
           )}
         </div>
 
+        {/* Feature stats */}
         <div className="grid grid-cols-3 gap-4 pt-8 border-t border-white/10">
           <div>
             <div className="text-2xl font-bold">658+</div>
@@ -183,18 +188,22 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
         </div>
       </div>
 
+      {/* Right panel — Unified Login Form */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 lg:px-12 py-10">
+        {/* Mobile Header */}
         <div className="flex items-center gap-2 mb-6 lg:hidden">
           <div className="bg-blue-700 rounded px-2 py-1 text-white font-bold text-xs">NST</div>
           <span className="font-bold text-gray-900 text-base">PlacePrep Portal</span>
         </div>
 
         <div className="w-full max-w-md">
+          {/* Header */}
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Sign In to PlacePrep</h2>
             <p className="text-sm text-gray-500 mt-1">Select your role to access your dedicated portal</p>
           </div>
 
+          {/* Role Selector Tabs */}
           <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-gray-100 rounded-xl mb-6 border border-gray-200">
             <button
               type="button"
@@ -231,10 +240,11 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
             </button>
           </div>
 
+          {/* Quick Demo Credentials Bar */}
           <div className="mb-6 p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-800 mb-2">
               <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-              Quick Demo Accounts (from login.md):
+              Quick Demo Accounts:
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -279,6 +289,7 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
             </div>
           )}
 
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">Email Address</label>
@@ -323,10 +334,11 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
               ) : (
                 <Shield className="w-4 h-4" />
               )}
-              {loading ? "Signing in..." : `Sign In to ${activeRole.toUpperCase()} Portal`}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
+          {/* Student Google SSO */}
           {activeRole === "student" && (
             <div className="mt-4">
               <button
@@ -340,20 +352,6 @@ export default function UnifiedLoginForm({ defaultRole = "admin" }: UnifiedLogin
             </div>
           )}
 
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">OR</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGuestAccess}
-            className="w-full flex items-center justify-center gap-2 bg-gray-100 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm hover:bg-gray-200 transition-colors"
-          >
-            <UserCheck className="w-4 h-4 text-gray-500" />
-            Guest Access (Demo Mode)
-          </button>
 
           <p className="text-xs text-center text-gray-400 mt-6 leading-relaxed">
             Authorized access for NST students, faculty, and administrators.

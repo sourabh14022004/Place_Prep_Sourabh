@@ -244,7 +244,7 @@ export default function UnifiedLoginForm({ defaultRole = "student" }: UnifiedLog
           <div className="mb-6 p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-800 mb-2">
               <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-              Quick Demo Accounts (from login.md):
+              Quick Demo Accounts:
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -334,7 +334,7 @@ export default function UnifiedLoginForm({ defaultRole = "student" }: UnifiedLog
               ) : (
                 <Shield className="w-4 h-4" />
               )}
-              {loading ? "Signing in..." : `Sign In to ${activeRole.toUpperCase()} Portal`}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
@@ -351,23 +351,6 @@ export default function UnifiedLoginForm({ defaultRole = "student" }: UnifiedLog
               </button>
             </div>
           )}
-
-          <div className="flex items-center gap-3 my-5">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-xs text-gray-400 font-medium">OR</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          {/* Quick Guest Access */}
-          <button
-            type="button"
-            onClick={handleGuestAccess}
-            className="w-full flex items-center justify-center gap-2 bg-gray-100 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm hover:bg-gray-200 transition-colors"
-          >
-            <UserCheck className="w-4 h-4 text-gray-500" />
-            Guest Access (Demo Mode)
-          </button>
-
           <p className="text-xs text-center text-gray-400 mt-6 leading-relaxed">
             Authorized access for NST students, faculty, and administrators.
             <br />
