@@ -22,9 +22,13 @@ export default function Navbar() {
 
         {/* Logo container matching Student Portal style */}
         <div className="flex items-center gap-2 lg:w-[216px] shrink-0">
-          <div className="bg-blue-700 rounded px-2 py-1 text-white font-bold text-xs">NST</div>
-          <span className="font-bold text-gray-900 text-sm hidden sm:inline-block">PlacePrep</span>
-          <span className="text-xs text-gray-900 font-semibold hidden md:inline-block">| Admin</span>
+          <img src="/newton-school-logo.png" alt="NST Logo" className="h-7 w-7 object-contain shrink-0" />
+          <span className="font-bold text-gray-900 text-sm hidden sm:inline-block">
+            PlacePrep
+          </span>
+          <span className="text-xs text-gray-900 font-semibold hidden md:inline-block">
+            | Admin
+          </span>
         </div>
 
         {/* Right actions */}

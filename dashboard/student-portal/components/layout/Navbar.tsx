@@ -7,6 +7,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { searchAll, type SearchResult } from "@/lib/mock-data";
 import { useNavbar } from "@/lib/navbar-context";
 
+
 // Unread notification count — reads from sessionStorage
 function useUnreadCount() {
   const [count, setCount] = useState(0);
@@ -98,7 +99,7 @@ export default function Navbar() {
       
       {/* Logo */}
       <div className="flex items-center gap-2 lg:w-[216px] shrink-0">
-        <div className="bg-blue-700 rounded px-2 py-1 text-white font-bold text-xs">NST</div>
+        <img src="/newton-school-logo.png" alt="NST Logo" className="h-7 w-7 object-contain shrink-0" />
         <span className="font-bold text-gray-900 text-sm hidden sm:inline-block">PlacePrep</span>
       </div>
 

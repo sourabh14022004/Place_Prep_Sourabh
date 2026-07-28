@@ -5,8 +5,9 @@ import {
  Edit2, Flame, RotateCcw, Trash2, AlertTriangle,
  X, Plus, Check, Save, Link2, Globe, GitBranch,
  Zap, Trophy, Target, Code2, TrendingUp, BookOpen,
- Shield, Eye, ChevronRight,
+ Shield, Eye, ChevronRight, LogOut,
 } from "lucide-react";
+import { useClerk, useUser } from "@clerk/nextjs";
 
 // ── Types ────────────────────────────────────────────
 type Tab = "overview" | "career" | "performance" | "settings";
@@ -44,6 +45,7 @@ const mockUser = {
  name: "Pranay Sarkar",
  initials: "PS",
  email: "pranay.sarkar@nst.edu",
+  imageUrl: "" as string | undefined,
  roll: "2201CS42",
  branch: "CS-AI",
  batch: "2023",
@@ -132,9 +134,17 @@ function OverviewTab({ user, onEdit }: { user: typeof mockUser; onEdit: () => vo
     <div className="bg-white border border-gray-200 rounded-md p-4 text-center">
      {/* Avatar */}
      <div className="relative inline-block mb-4">
-      <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white font-bold text-2xl shadow-lg">
-       {user.initials}
-      </div>
+      {user.imageUrl ? (
+       <img
+        src={user.imageUrl}
+        alt={user.name}
+        className="w-24 h-24 rounded-lg object-cover shadow-lg border border-gray-200"
+       />
+      ) : (
+       <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white font-bold text-2xl shadow-lg">
+        {user.initials}
+       </div>
+      )}
       <button
        className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center shadow-md hover:bg-blue-700 "
        aria-label="Change avatar"
@@ -650,17 +660,25 @@ function PerformanceTab({ user }: { user: typeof mockUser }) {
 }
 
 // ── Tab 4: Settings ─────────────────────────────────────
-function SettingsTab() {
+function SettingsTab({ email, onLogout }: { email: string; onLogout: () => void }) {
  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
  return (
   <div className="space-y-5 max-w-2xl">
    {/* Account Info */}
-   <div className="bg-white border border-gray-200 rounded-md p-4">
-    <h3 className="font-semibold text-gray-900 mb-2">Account</h3>
-    <p className="text-sm text-gray-500">Logged in as <span className="font-medium text-gray-800">pranay.sarkar@nst.edu</span></p>
-    <p className="text-xs text-gray-400 mt-1">Authentication managed via NST SSO — contact IT for changes.</p>
+   <div className="bg-white border border-gray-200 rounded-md p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+     <h3 className="font-semibold text-gray-900 mb-1">Account</h3>
+     <p className="text-sm text-gray-500">Logged in as <span className="font-medium text-gray-800">{email}</span></p>
+     <p className="text-xs text-gray-400 mt-1">Authentication managed via Clerk SSO.</p>
+    </div>
+    <button
+     onClick={onLogout}
+     className="shrink-0 flex items-center gap-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors"
+    >
+     <LogOut className="w-4 h-4" /> Log Out
+    </button>
    </div>
 
    {/* Danger Zone */}
@@ -715,6 +733,38 @@ function SettingsTab() {
 // ── Main Profile Page ─────────────────────────────────
 export default function ProfilePage() {
  const [activeTab, setActiveTab] = useState<Tab>("overview");
+ const { signOut } = useClerk();
+ const { user: clerkUser, isLoaded } = useUser();
+
+ const realName = isLoaded && clerkUser ? (clerkUser.fullName || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Student User") : mockUser.name;
+ const realEmail = isLoaded && clerkUser ? (clerkUser.primaryEmailAddress?.emailAddress || mockUser.email) : mockUser.email;
+ const realImage = isLoaded && clerkUser ? clerkUser.imageUrl : undefined;
+ const initials = isLoaded && clerkUser && clerkUser.firstName
+  ? `${clerkUser.firstName[0]}${clerkUser.lastName?.[0] || ""}`.toUpperCase()
+  : mockUser.initials;
+
+ const userProfile = {
+  ...mockUser,
+  name: realName,
+  email: realEmail,
+  imageUrl: realImage,
+  initials: initials,
+ };
+
+ const handleLogout = async () => {
+  document.cookie = "student_authed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  document.cookie = "has_onboarded=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  try {
+   sessionStorage.clear();
+   localStorage.clear();
+  } catch {}
+  try {
+   if (signOut) {
+    await signOut({ redirectUrl: "/login" });
+   }
+  } catch {}
+  window.location.href = "/login";
+ };
 
  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "overview",   label: "Overview",     icon: User },
@@ -750,10 +800,10 @@ export default function ProfilePage() {
    </div>
 
    {/* Tab Content */}
-   {activeTab === "overview"  && <OverviewTab  user={mockUser} onEdit={() => setActiveTab("career")} />}
-   {activeTab === "career"   && <CareerTab   user={mockUser} />}
-   {activeTab === "performance" && <PerformanceTab user={mockUser} />}
-   {activeTab === "settings"  && <SettingsTab />}
+   {activeTab === "overview"  && <OverviewTab  user={userProfile} onEdit={() => setActiveTab("career")} />}
+   {activeTab === "career"   && <CareerTab   user={userProfile} />}
+   {activeTab === "performance" && <PerformanceTab user={userProfile} />}
+   {activeTab === "settings"  && <SettingsTab email={realEmail} onLogout={handleLogout} />}
   </div>
  );
 }

@@ -2,14 +2,20 @@
 
 import { useState } from "react";
 import { Mail, Briefcase, Calendar, MapPin, Building2, User, X } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 
 export default function ProfilePage() {
+  const { user, isLoaded } = useUser();
+
+  const realName = isLoaded && user ? (user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Prof. Sharma") : "Prof. Sharma";
+  const realEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || "sharma.p@newtonschool.co") : "sharma.p@newtonschool.co";
+  const realImage = isLoaded && user ? user.imageUrl : undefined;
+  const initials = isLoaded && user && user.firstName ? `${user.firstName[0]}${user.lastName?.[0] || ""}`.toUpperCase() : "PS";
+
   const [profile, setProfile] = useState({
-    name: "Prof. Sharma",
     title: "Senior Faculty, Computer Science Dept.",
     experience: "12+ Years Experience",
     campus: "Bangalore Campus",
-    email: "sharma.p@newtonschool.co",
     employeeId: "EMP-4092",
     department: "CS & Engineering",
     joined: "Aug 2021",
@@ -17,12 +23,20 @@ export default function ProfilePage() {
   });
 
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ ...profile });
+  const [formData, setFormData] = useState({ name: realName, email: realEmail, ...profile });
   const [showToast, setShowToast] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    setProfile({ ...formData });
+    setProfile({
+      title: formData.title,
+      experience: formData.experience,
+      campus: formData.campus,
+      employeeId: formData.employeeId,
+      department: formData.department,
+      joined: formData.joined,
+      expertises: profile.expertises,
+    });
     setEditModalOpen(false);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
@@ -41,13 +55,17 @@ export default function ProfilePage() {
         <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
         <div className="px-6 pb-6 relative">
           <div className="w-24 h-24 rounded-full border-4 border-white bg-blue-100 flex items-center justify-center -mt-12 mb-4 shadow-sm overflow-hidden">
-             <div className="flex items-center justify-center w-full h-full bg-blue-600 text-white text-3xl font-bold">
-               {profile.name.split(" ").map(n => n[0]).join("")}
-             </div>
+             {realImage ? (
+               <img src={realImage} alt={realName} className="w-full h-full object-cover" />
+             ) : (
+               <div className="flex items-center justify-center w-full h-full bg-blue-600 text-white text-3xl font-bold">
+                 {initials}
+               </div>
+             )}
           </div>
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{realName}</h1>
               <p className="text-gray-500 font-medium">{profile.title}</p>
               
               <div className="flex flex-wrap gap-4 mt-4 text-sm text-gray-600">
@@ -61,13 +79,13 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Mail className="w-4 h-4 text-gray-400" />
-                  {profile.email}
+                  {realEmail}
                 </div>
               </div>
             </div>
             <button 
               onClick={() => {
-                setFormData({ ...profile });
+                setFormData({ name: realName, email: realEmail, ...profile });
                 setEditModalOpen(true);
               }}
               className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors cursor-pointer"

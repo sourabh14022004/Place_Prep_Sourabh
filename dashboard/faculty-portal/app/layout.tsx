@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { FacultyProvider } from "@/lib/context/FacultyContext";
+import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
   title: "PlacePrep - Faculty Portal",
@@ -15,9 +16,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-gray-50 text-gray-900 h-full" suppressHydrationWarning>
-        <FacultyProvider>
-          {children}
-        </FacultyProvider>
+        <ClerkProvider afterSignOutUrl="/login">
+          <FacultyProvider>
+            {children}
+          </FacultyProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useClerk, useUser } from "@clerk/nextjs";
 import {
   Building2,
   CalendarDays,
@@ -25,9 +26,44 @@ const navigation = [
 
 export function SidebarContent() {
   const pathname = usePathname();
+  const { signOut } = useClerk();
+  const { user: clerkUser, isLoaded } = useUser();
+
+  const realName = isLoaded && clerkUser ? (clerkUser.fullName || clerkUser.firstName || "Faculty Member") : "Faculty Member";
+  const realEmail = isLoaded && clerkUser ? (clerkUser.primaryEmailAddress?.emailAddress || "faculty@nst.edu") : "faculty@nst.edu";
+  const realImage = isLoaded && clerkUser ? clerkUser.imageUrl : undefined;
+  const initials = isLoaded && clerkUser && clerkUser.firstName ? `${clerkUser.firstName[0]}${clerkUser.lastName?.[0] || ""}`.toUpperCase() : "FC";
+
+  const handleLogout = async () => {
+    document.cookie = "faculty_authed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    try {
+      sessionStorage.clear();
+      localStorage.clear();
+    } catch {}
+    try {
+      if (signOut) {
+        await signOut({ redirectUrl: "/login" });
+      }
+    } catch {}
+    window.location.href = "/login";
+  };
 
   return (
     <div className="flex h-full w-full flex-col bg-white pt-3">
+      {/* Faculty User Info pill */}
+      <div className="mx-3 mb-3 flex items-center gap-2.5 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 shrink-0">
+        {realImage ? (
+          <img src={realImage} alt={realName} className="h-7 w-7 rounded-full object-cover shrink-0" />
+        ) : (
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-700 text-[10px] font-bold text-white">
+            {initials}
+          </div>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-gray-900">{realName}</p>
+          <p className="truncate text-[10px] text-gray-400 font-medium">{realEmail}</p>
+        </div>
+      </div>
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 px-3 overflow-y-auto">
         <p className="px-3 mb-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -55,18 +91,18 @@ export function SidebarContent() {
       {/* Bottom section */}
       <div className="border-t border-gray-200 p-3 space-y-1 shrink-0">
         <button
-          onClick={() => {
-            document.cookie = "faculty_authed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            window.location.href = "/login";
-          }}
+          onClick={handleLogout}
           className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4 shrink-0 text-gray-400 group-hover:text-red-500" />
           Logout
         </button>
-        <p className="px-3 pt-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          NST PlacePrep
-        </p>
+        <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center gap-2 px-3">
+          <img src="/newton-school-logo.png" alt="NST Logo" className="h-6 w-6 object-contain shrink-0" />
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            PlacePrep
+          </span>
+        </div>
       </div>
     </div>
   );

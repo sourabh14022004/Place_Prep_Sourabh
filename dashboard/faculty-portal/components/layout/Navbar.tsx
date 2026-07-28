@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Bell, User, Megaphone, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Menu,
+  X,
+  Bell,
+  User,
+  Megaphone,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { SidebarContent } from "./Sidebar";
 
 export default function Navbar() {
+  const { user } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [targetGroup, setTargetGroup] = useState("All Students");
@@ -43,9 +54,13 @@ export default function Navbar() {
 
         {/* Logo container matching Student Portal style */}
         <div className="flex items-center gap-2 lg:w-[216px] shrink-0">
-          <div className="bg-blue-700 rounded px-2 py-1 text-white font-bold text-xs">NST</div>
-          <span className="font-bold text-gray-900 text-sm hidden sm:inline-block">PlacePrep</span>
-          <span className="text-xs text-blue-600 font-semibold hidden md:inline-block">| Faculty</span>
+          <img src="/newton-school-logo.png" alt="NST Logo" className="h-7 w-7 object-contain shrink-0" />
+          <span className="font-bold text-gray-900 text-sm hidden sm:inline-block">
+            PlacePrep
+          </span>
+          <span className="text-xs text-blue-600 font-semibold hidden md:inline-block">
+            | Faculty
+          </span>
         </div>
 
         {/* Right actions */}
@@ -72,9 +87,17 @@ export default function Navbar() {
           <Link
             href="/profile"
             aria-label="Profile"
-            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700 shrink-0"
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700 shrink-0 overflow-hidden"
           >
-            <User className="w-4.5 h-4.5" />
+            {user?.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt={user.fullName ?? "Profile"}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="w-4.5 h-4.5" />
+            )}
           </Link>
         </div>
       </header>
@@ -89,8 +112,12 @@ export default function Navbar() {
                   <Megaphone className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-gray-900">Broadcast Announcement</h3>
-                  <p className="text-xs text-gray-500">Push live notice to student dashboards</p>
+                  <h3 className="text-base font-bold text-gray-900">
+                    Broadcast Announcement
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Push live notice to student dashboards
+                  </p>
                 </div>
               </div>
               <button
@@ -103,21 +130,33 @@ export default function Navbar() {
 
             <form onSubmit={handlePublishBroadcast} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Target Audience</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Target Audience
+                </label>
                 <select
                   value={targetGroup}
                   onChange={(e) => setTargetGroup(e.target.value)}
                   className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  <option value="All Students">All NST Students (Batch 2023–2027)</option>
-                  <option value="Batch 2023-2027 (CS)">Batch 2023-2027 (CS)</option>
-                  <option value="Batch 2024-2028 (CS-AI)">Batch 2024-2028 (CS-AI)</option>
-                  <option value="My Mentored Students">My Mentored Students Only</option>
+                  <option value="All Students">
+                    All NST Students (Batch 2023–2027)
+                  </option>
+                  <option value="Batch 2023-2027 (CS)">
+                    Batch 2023-2027 (CS)
+                  </option>
+                  <option value="Batch 2024-2028 (CS-AI)">
+                    Batch 2024-2028 (CS-AI)
+                  </option>
+                  <option value="My Mentored Students">
+                    My Mentored Students Only
+                  </option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Notice Title</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Notice Title
+                </label>
                 <input
                   type="text"
                   required
@@ -129,7 +168,9 @@ export default function Navbar() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Message Content</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Message Content
+                </label>
                 <textarea
                   required
                   rows={3}
@@ -148,7 +189,10 @@ export default function Navbar() {
                   onChange={(e) => setIsHighPriority(e.target.checked)}
                   className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
                 />
-                <label htmlFor="highPriority" className="text-xs font-medium text-gray-700 flex items-center gap-1 cursor-pointer">
+                <label
+                  htmlFor="highPriority"
+                  className="text-xs font-medium text-gray-700 flex items-center gap-1 cursor-pointer"
+                >
                   <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                   Mark as Urgent Priority (Banner Notice)
                 </label>
