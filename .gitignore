@@ -6,3 +6,6 @@
 **/dist
 **/build
 **/.next
+*.env
+*.env.*
+atlas-credentials.env

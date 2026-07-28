@@ -1,23 +1,38 @@
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const isAuthPage = request.nextUrl.pathname.startsWith("/login");
-  const isAuthenticated = request.cookies.has("admin_authed");
+const isPublicRoute = createRouteMatcher(["/login(.*)"]);
 
-  if (!isAuthenticated && !isAuthPage) {
-    return NextResponse.redirect(new URL("/login", request.url));
+export default clerkMiddleware(async (auth, req) => {
+  const { userId, sessionClaims } = await auth();
+
+  if (isPublicRoute(req)) {
+    return;
   }
 
-  if (isAuthenticated && isAuthPage) {
-    return NextResponse.redirect(new URL("/overview", request.url));
+  if (!userId) {
+    return NextResponse.redirect(new URL("http://localhost:3000/login"));
   }
 
-  return NextResponse.next();
-}
+  const publicMeta = (sessionClaims as any)?.publicMetadata || (sessionClaims as any)?.public_metadata;
+  const unsafeMeta = (sessionClaims as any)?.unsafeMetadata || (sessionClaims as any)?.unsafe_metadata;
+  const role = (publicMeta?.role || unsafeMeta?.role) as string | undefined;
+
+  if (role) {
+    const cleanRole = role.toLowerCase();
+    if (cleanRole === "student") {
+      return NextResponse.redirect(new URL("http://localhost:3000/dashboard"));
+    }
+    if (cleanRole === "faculty") {
+      return NextResponse.redirect(new URL("http://localhost:3001/"));
+    }
+  }
+});
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/(api|trpc)(.*)",
+    "/__clerk/:path*",
   ],
 };
