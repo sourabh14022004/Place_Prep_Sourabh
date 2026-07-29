@@ -19,11 +19,26 @@ export function getPortalUrl(role: PortalRole, path: string = ""): string {
   if (typeof window === "undefined") return path;
   const host = window.location.hostname;
   const currentPort = window.location.port;
+  const isLocal = host === "localhost" || host === "127.0.0.1";
 
-  if (host === "localhost" || host === "127.0.0.1") {
-    if (role === "student" && currentPort !== "3000") return `http://${host}:3000${path}`;
-    if (role === "faculty" && currentPort !== "3001") return `http://${host}:3001${path}`;
-    if (role === "admin" && currentPort !== "3002") return `http://${host}:3002${path}`;
+  const studentBase = process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL || (isLocal ? "http://localhost:3000" : "");
+  const facultyBase = process.env.NEXT_PUBLIC_FACULTY_PORTAL_URL || (isLocal ? "http://localhost:3001" : "");
+  const adminBase = process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL || (isLocal ? "http://localhost:3002" : "");
+
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  if (role === "student") {
+    if (isLocal && currentPort === "3000") return path;
+    if (studentBase) return `${studentBase.replace(/\/$/, "")}${cleanPath}`;
   }
+  if (role === "faculty") {
+    if (isLocal && currentPort === "3001") return path;
+    if (facultyBase) return `${facultyBase.replace(/\/$/, "")}${cleanPath}`;
+  }
+  if (role === "admin") {
+    if (isLocal && currentPort === "3002") return path;
+    if (adminBase) return `${adminBase.replace(/\/$/, "")}${cleanPath}`;
+  }
+
   return path;
 }

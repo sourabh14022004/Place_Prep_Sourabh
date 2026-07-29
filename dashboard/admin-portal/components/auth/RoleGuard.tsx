@@ -19,7 +19,7 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
 
     if (!isSignedIn) {
       const loginUrl = getPortalUrl("student", "/login");
-      window.location.href = loginUrl.startsWith("http") ? loginUrl : "http://localhost:3000/login";
+      window.location.href = loginUrl;
       return;
     }
 
