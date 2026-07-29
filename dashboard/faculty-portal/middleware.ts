@@ -15,25 +15,27 @@ export default clerkMiddleware(async (auth, req) => {
     return;
   }
 
+  const isLocalhost = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
+  const studentUrl = process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL || (isLocalhost ? "http://localhost:3000" : undefined);
+
   if (!userId) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginTarget = studentUrl ? `${studentUrl.replace(/\/$/, "")}/login` : "/login";
+    return NextResponse.redirect(new URL(loginTarget, req.url));
   }
 
-  const isLocalhost = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
+  const publicMeta = (sessionClaims as any)?.publicMetadata || (sessionClaims as any)?.public_metadata;
+  const unsafeMeta = (sessionClaims as any)?.unsafeMetadata || (sessionClaims as any)?.unsafe_metadata;
+  const role = (publicMeta?.role || unsafeMeta?.role) as string | undefined;
 
-  if (isLocalhost) {
-    const publicMeta = (sessionClaims as any)?.publicMetadata || (sessionClaims as any)?.public_metadata;
-    const unsafeMeta = (sessionClaims as any)?.unsafeMetadata || (sessionClaims as any)?.unsafe_metadata;
-    const role = (publicMeta?.role || unsafeMeta?.role) as string | undefined;
+  if (role) {
+    const cleanRole = role.toLowerCase();
+    const adminUrl = process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL || (isLocalhost ? "http://localhost:3002/overview" : undefined);
 
-    if (role) {
-      const cleanRole = role.toLowerCase();
-      if (cleanRole === "student") {
-        return NextResponse.redirect(new URL("http://localhost:3000/dashboard"));
-      }
-      if (cleanRole === "admin") {
-        return NextResponse.redirect(new URL("http://localhost:3002/overview"));
-      }
+    if (cleanRole === "student" && studentUrl) {
+      return NextResponse.redirect(new URL(`${studentUrl.replace(/\/$/, "")}/dashboard`));
+    }
+    if (cleanRole === "admin" && adminUrl) {
+      return NextResponse.redirect(new URL(adminUrl));
     }
   }
 });

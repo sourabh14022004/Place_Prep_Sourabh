@@ -15,18 +15,21 @@ export default clerkMiddleware(async (auth, req) => {
 
   const isLocalhost = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
 
-  if (userId && isLocalhost) {
+  if (userId) {
     const publicMeta = (sessionClaims as any)?.publicMetadata || (sessionClaims as any)?.public_metadata;
     const unsafeMeta = (sessionClaims as any)?.unsafeMetadata || (sessionClaims as any)?.unsafe_metadata;
     const role = (publicMeta?.role || unsafeMeta?.role) as string | undefined;
 
     if (role) {
       const cleanRole = role.toLowerCase();
-      if (cleanRole === "faculty") {
-        return NextResponse.redirect(new URL("http://localhost:3001/"));
+      const facultyUrl = process.env.NEXT_PUBLIC_FACULTY_PORTAL_URL || (isLocalhost ? "http://localhost:3001/" : undefined);
+      const adminUrl = process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL || (isLocalhost ? "http://localhost:3002/overview" : undefined);
+
+      if (cleanRole === "faculty" && facultyUrl) {
+        return NextResponse.redirect(new URL(facultyUrl));
       }
-      if (cleanRole === "admin") {
-        return NextResponse.redirect(new URL("http://localhost:3002/overview"));
+      if (cleanRole === "admin" && adminUrl) {
+        return NextResponse.redirect(new URL(adminUrl));
       }
     }
   }
