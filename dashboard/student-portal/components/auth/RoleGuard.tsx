@@ -22,11 +22,9 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
       const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
       const authBase = isLocal
         ? "http://localhost:3003"
-        : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "");
+        : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "https://place-prep-sourabh-mocha.vercel.app");
       const redirectBack = encodeURIComponent(window.location.href);
-      window.location.href = authBase
-        ? `${authBase.replace(/\/$/, "")}/login?redirect_url=${redirectBack}`
-        : "/";
+      window.location.href = `${authBase.replace(/\/$/, "")}/login?redirect_url=${redirectBack}`;
       return;
     }
 
@@ -41,8 +39,8 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
       const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
       const authBase = isLocal
         ? "http://localhost:3003"
-        : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "");
-      window.location.href = authBase ? `${authBase.replace(/\/$/, "")}/login` : "/";
+        : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "https://place-prep-sourabh-mocha.vercel.app");
+      window.location.href = `${authBase.replace(/\/$/, "")}/login`;
     } else {
       setAuthorized(true);
     }

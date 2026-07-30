@@ -19,7 +19,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     const authBase = isLocal
       ? "http://localhost:3003"
-      : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "");
+      : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "https://place-prep-sourabh-mocha.vercel.app");
 
     if (authBase) {
       const loginUrl = `${authBase.replace(/\/$/, "")}/login?redirect_url=${encodeURIComponent(req.url)}`;
