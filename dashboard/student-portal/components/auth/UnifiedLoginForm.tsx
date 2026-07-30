@@ -9,6 +9,7 @@ import { extractUserRole, getPortalUrl, PortalRole } from "@/lib/role";
 
 interface UnifiedLoginFormProps {
   defaultRole?: PortalRole;
+  redirectUrl?: string; // Original URL the user tried to visit before being sent to login
 }
 
 type AuthMode = "signin" | "signup" | "forgot";
@@ -24,7 +25,7 @@ const checkStudentOnboarded = (): boolean => {
   }
 };
 
-export default function UnifiedLoginForm({ defaultRole = "student" }: UnifiedLoginFormProps) {
+export default function UnifiedLoginForm({ defaultRole = "student", redirectUrl }: UnifiedLoginFormProps) {
   const router = useRouter();
   const clerk = useClerk();
   const { isLoaded: isUserLoaded, isSignedIn, user } = useUser();
@@ -56,6 +57,30 @@ export default function UnifiedLoginForm({ defaultRole = "student" }: UnifiedLog
 
   const performRedirect = (role: PortalRole) => {
     setRedirecting(true);
+
+    // If the user came from another portal with a redirect_url, send them back there
+    // (only if the redirect_url matches their role's portal domain)
+    if (redirectUrl) {
+      try {
+        const redirectHost = new URL(redirectUrl).hostname;
+        const facultyBase = process.env.NEXT_PUBLIC_FACULTY_PORTAL_URL;
+        const adminBase = process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL;
+        const facultyHost = facultyBase ? new URL(facultyBase).hostname : "";
+        const adminHost = adminBase ? new URL(adminBase).hostname : "";
+
+        const isFromFaculty = facultyHost && redirectHost === facultyHost;
+        const isFromAdmin = adminHost && redirectHost === adminHost;
+
+        if ((role === "faculty" && isFromFaculty) || (role === "admin" && isFromAdmin)) {
+          document.cookie = `${role}_authed=true; path=/; max-age=31536000`;
+          window.location.href = redirectUrl;
+          return;
+        }
+      } catch {
+        // Invalid redirect_url, fall through to default behavior
+      }
+    }
+
     let targetPath = "/dashboard";
     if (role === "student") {
       document.cookie = "student_authed=true; path=/; max-age=31536000";

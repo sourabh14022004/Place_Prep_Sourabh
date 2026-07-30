@@ -19,7 +19,8 @@ export default clerkMiddleware(async (auth, req) => {
   const studentUrl = process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL || (isLocalhost ? "http://localhost:3000" : undefined);
 
   if (!userId) {
-    const loginTarget = studentUrl ? `${studentUrl.replace(/\/$/, "")}/login` : "/login";
+    const loginBase = studentUrl ? `${studentUrl.replace(/\/$/, "")}/login` : "/login";
+    const loginTarget = `${loginBase}?redirect_url=${encodeURIComponent(req.url)}`;
     return NextResponse.redirect(new URL(loginTarget, req.url));
   }
 
