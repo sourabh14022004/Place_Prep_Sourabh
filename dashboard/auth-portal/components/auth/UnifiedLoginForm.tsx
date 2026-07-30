@@ -74,13 +74,19 @@ export default function UnifiedLoginForm({ redirectUrl }: UnifiedLoginFormProps)
 
         const portMatches = isLocal && redirectTarget.port === rolePort;
         const envBase = {
-          student: process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL || "",
-          faculty: process.env.NEXT_PUBLIC_FACULTY_PORTAL_URL || "",
-          admin: process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL || "",
+          student: process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL || "https://place-prep-sourabh.vercel.app",
+          faculty: process.env.NEXT_PUBLIC_FACULTY_PORTAL_URL || "https://place-prep-faculty-portal-gkw93ncxs-sourabh14022004s-projects.vercel.app",
+          admin: process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL || "https://place-prep-admin-portal-okbo5332j-sourabh14022004s-projects.vercel.app",
         }[role];
-        const hostMatches = !isLocal && envBase && redirectTarget.hostname === new URL(envBase).hostname;
 
-        if (portMatches || hostMatches) {
+        let hostMatches = false;
+        try {
+          hostMatches = !isLocal && envBase ? redirectTarget.hostname.includes("vercel.app") || redirectTarget.hostname === new URL(envBase).hostname : false;
+        } catch {
+          hostMatches = !isLocal && redirectTarget.hostname.includes("vercel.app");
+        }
+
+        if (portMatches || hostMatches || (!isLocal && redirectTarget.protocol.startsWith("http"))) {
           window.location.href = redirectUrl;
           return;
         }
