@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
-import { extractUserRole, getPortalUrl, PortalRole } from "@/lib/role";
+import { extractUserRole, PortalRole } from "@/lib/role";
 
 interface RoleGuardProps {
   allowedRole: PortalRole;
@@ -18,8 +18,14 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
     if (!isLoaded) return;
 
     if (!isSignedIn) {
-      const loginUrl = getPortalUrl("student", "/login");
-      window.location.href = loginUrl;
+      const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const authBase = isLocal
+        ? "http://localhost:3003"
+        : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "");
+      const redirectBack = encodeURIComponent(window.location.href);
+      window.location.href = authBase
+        ? `${authBase.replace(/\/$/, "")}/login?redirect_url=${redirectBack}`
+        : "/login";
       return;
     }
 
@@ -30,12 +36,11 @@ export default function RoleGuard({ allowedRole, children }: RoleGuardProps) {
     );
 
     if (detectedRole !== allowedRole) {
-      let targetPath = "/dashboard";
-      if (detectedRole === "faculty") targetPath = "/";
-      if (detectedRole === "admin") targetPath = "/overview";
-
-      const redirectUrl = getPortalUrl(detectedRole, targetPath);
-      window.location.href = redirectUrl;
+      const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const authBase = isLocal
+        ? "http://localhost:3003"
+        : (process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "");
+      window.location.href = authBase ? `${authBase.replace(/\/$/, "")}/login` : "/login";
     } else {
       setAuthorized(true);
     }
