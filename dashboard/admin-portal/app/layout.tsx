@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   description: "NST PlacePrep Admin Portal — Manage students, faculty, and placement operations.",
 };
 
+const AUTH_PORTAL_URL =
+  process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "https://place-prep-sourabh-mocha.vercel.app";
+const IS_SATELLITE = process.env.NEXT_PUBLIC_CLERK_IS_SATELLITE === "true";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -15,10 +19,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-gray-50 text-gray-900" suppressHydrationWarning>
-        <ClerkProvider afterSignOutUrl="/login">
+        <ClerkProvider
+          isSatellite={IS_SATELLITE}
+          signInUrl={IS_SATELLITE ? `${AUTH_PORTAL_URL}/login` : undefined}
+          afterSignOutUrl={IS_SATELLITE ? `${AUTH_PORTAL_URL}/login` : "/login"}
+        >
           {children}
         </ClerkProvider>
       </body>
     </html>
   );
 }
+

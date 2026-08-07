@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+
 import {
   Activity, Trophy, CheckSquare, Square, ExternalLink,
   Clock, TrendingUp, ChevronRight, Zap
@@ -12,12 +13,15 @@ import {
   getUserRoadmapCompanies,
   userPrepStats,
 } from "@/lib/mock-data";
+import { useUser } from "@clerk/nextjs";
+import { fetchStudentProfile } from "@/lib/api";
+import CompanyLogo from "@/components/ui/CompanyLogo";
 
 // Prep Score — calculated from real product features only:
 // 1. Practice consistency: problems solved vs. assigned (45%)
 // 2. Day streak score: current streak / 30 × 100 (30%)
 // 3. XP progress: xpEarned / maxXpForLevel × 100 (25%)
-function calcPrepScore(stats: typeof userPrepStats): number {
+function calcPrepScore(stats: { problemsSolved: number; totalAssigned: number; dayStreak: number; xpEarned: number; maxXpForLevel: number }): number {
   const practiceScore = Math.min((stats.problemsSolved / stats.totalAssigned) * 100, 100) * 0.45;
   const streakScore = Math.min((stats.dayStreak / 30) * 100, 100) * 0.30;
   const xpScore = Math.min((stats.xpEarned / stats.maxXpForLevel) * 100, 100) * 0.25;
@@ -26,13 +30,14 @@ function calcPrepScore(stats: typeof userPrepStats): number {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user } = useUser();
   const [checked, setChecked] = useState<Record<number, boolean>>({
-    // Pre-mark questions already done in mock data
     1: true, 10: true, 11: true,
   });
 
   const [targetCompanies, setTargetCompanies] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     // Check onboarding status first
@@ -48,16 +53,39 @@ export default function DashboardPage() {
       }
     } catch { /* ignore */ }
 
+    async function loadLiveUserData() {
+      if (user?.id || user?.primaryEmailAddress?.emailAddress) {
+        const profile = await fetchStudentProfile(user.id, user.primaryEmailAddress?.emailAddress);
+        if (profile) {
+          setUserProfile(profile);
+          if (profile.roadmap?.companies && profile.roadmap.companies.length > 0) {
+            const mapped = profile.roadmap.companies.map((c: any) => ({
+              initial: c.name ? c.name[0].toUpperCase() : "C",
+              name: c.name,
+              role: c.role || "SDE-1",
+              readiness: 45,
+              color: "bg-blue-600",
+              slug: c.slug,
+            }));
+            setTargetCompanies(mapped);
+          }
+        }
+      }
+    }
+    loadLiveUserData();
+
     const roadmaps = getUserRoadmapCompanies();
-    const mappedCompanies = roadmaps.map(r => ({
-      initial: r.initial,
-      name: r.name,
-      role: r.role,
-      readiness: r.pctComplete > 0 ? r.pctComplete : Math.round((r.currentWeek / r.totalWeeks) * 100) || 0,
-      color: r.color,
-      slug: r.slug
-    }));
-    setTargetCompanies(mappedCompanies);
+    if (targetCompanies.length === 0) {
+      const mappedCompanies = roadmaps.map(r => ({
+        initial: r.initial,
+        name: r.name,
+        role: r.role,
+        readiness: r.pctComplete > 0 ? r.pctComplete : Math.round((r.currentWeek / r.totalWeeks) * 100) || 0,
+        color: r.color,
+        slug: r.slug
+      }));
+      setTargetCompanies(mappedCompanies);
+    }
 
     const mappedTasks = roadmaps.map(r => {
       const activeWeek = r.weeks.find(w => w.status === "active") || r.weeks[0];
@@ -102,12 +130,10 @@ export default function DashboardPage() {
                   <div key={co.name} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow flex flex-col">
                     <div className="flex items-center justify-between mb-3 flex-1">
                       <div className="flex items-center gap-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`https://www.google.com/s2/favicons?sz=64&domain=${co.slug}.com`}
-                          alt={co.name}
-                          className="w-10 h-10 rounded-lg shrink-0 object-contain bg-white border border-gray-100 p-1"
-                          onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+                        <CompanyLogo
+                          slug={co.slug}
+                          name={co.name}
+                          className="w-10 h-10 rounded-lg"
                         />
                         <div>
                           <div className="font-semibold text-gray-900 text-sm">{co.name}</div>
@@ -243,12 +269,9 @@ export default function DashboardPage() {
                 className="block bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-gray-300 transition-all cursor-pointer"
               >
                 <div className="flex items-center gap-2 mb-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://www.google.com/s2/favicons?sz=64&domain=${r.name.toLowerCase()}.com`}
-                    alt={r.name}
-                    className="w-8 h-8 rounded-lg shrink-0 object-contain bg-white border border-gray-100 p-0.5"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+                  <CompanyLogo
+                    name={r.name}
+                    className="w-8 h-8 rounded-lg"
                   />
                   <span className="font-semibold text-gray-900 text-sm">{r.name}</span>
                   <span className="ml-auto text-xs text-gray-400">{r.time}</span>
@@ -310,14 +333,14 @@ export default function DashboardPage() {
         {/* Streak */}
         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
           <Activity className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-          <div className="text-2xl font-bold text-gray-900">{userPrepStats.dayStreak}</div>
+          <div className="text-2xl font-bold text-gray-900">{userProfile?.streakDays ?? userPrepStats.dayStreak}</div>
           <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Day Streak</div>
         </div>
 
         {/* XP Badge */}
         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
           <Trophy className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-          <div className="text-2xl font-bold text-gray-900">{userPrepStats.xpEarned.toLocaleString()}</div>
+          <div className="text-2xl font-bold text-gray-900">{(userProfile?.xp ?? userPrepStats.xpEarned).toLocaleString()}</div>
           <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">XP Earned</div>
         </div>
 
@@ -361,7 +384,7 @@ export default function DashboardPage() {
           <h3 className="text-xs font-semibold text-gray-900 mb-3 uppercase tracking-wide">Problems Solved</h3>
           <div className="flex items-end justify-between">
             <div>
-              <span className="text-3xl font-bold text-gray-900">{userPrepStats.problemsSolved}</span>
+              <span className="text-3xl font-bold text-gray-900">{userProfile?.solvedQuestions?.length ?? userPrepStats.problemsSolved}</span>
               <span className="text-sm text-gray-400 ml-1">/ {userPrepStats.totalAssigned}</span>
             </div>
             <TrendingUp className="w-5 h-5 text-green-500" />
@@ -369,7 +392,7 @@ export default function DashboardPage() {
           <div className="h-1.5 bg-gray-100 rounded-full mt-3">
             <div
               className="h-1.5 bg-green-500 rounded-full"
-              style={{ width: `${(userPrepStats.problemsSolved / userPrepStats.totalAssigned) * 100}%` }}
+              style={{ width: `${Math.min(((userProfile?.solvedQuestions?.length ?? userPrepStats.problemsSolved) / userPrepStats.totalAssigned) * 100, 100)}%` }}
             />
           </div>
           <p className="text-[10px] text-gray-400 mt-1.5">Assigned roadmap problems</p>

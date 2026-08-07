@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { X, Calendar, CheckCircle } from "lucide-react";
 import { type RoadmapCompanyEntry } from "@/lib/mock-data";
+import CompanyLogo from "@/components/ui/CompanyLogo";
 
 const WEEK_OPTIONS = [4, 8, 12, 16, 24];
 
@@ -12,6 +13,7 @@ interface Props {
     initial: string;
     color: string;
     type: string;
+    logoUrl?: string;
   } | null;
   onClose: () => void;
   onAdded: (slug: string) => void;
@@ -98,12 +100,11 @@ export default function AddToRoadmapModal({ company, onClose, onAdded }: Props) 
             <>
               {/* Company badge */}
               <div className="flex items-center gap-3 mb-5">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`https://www.google.com/s2/favicons?sz=64&domain=${company.slug}.com`}
-                  alt={company.name}
-                  className="w-12 h-12 rounded-xl shrink-0 object-contain bg-white border border-gray-100 p-1 shadow-sm"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+                <CompanyLogo
+                  logoUrl={company.logoUrl}
+                  slug={company.slug}
+                  name={company.name}
+                  className="w-12 h-12 rounded-xl"
                 />
                 <div>
                   <div className="font-bold text-gray-900 text-lg">{company.name}</div>

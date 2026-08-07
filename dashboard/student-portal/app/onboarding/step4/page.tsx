@@ -1,7 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { Rocket, CheckCircle, Zap, Calendar } from "lucide-react";
 import Stepper from "@/components/onboarding/Stepper";
+import { saveStudentOnboarding } from "@/lib/api";
 
 const readyItems = [
   "Custom roadmap based on your timeline and goals",
@@ -12,11 +14,35 @@ const readyItems = [
 
 export default function Step4() {
   const router = useRouter();
+  const { user } = useUser();
 
-  const handleLaunch = () => {
-    // BACKEND TODO: POST /api/user/me/onboarding/complete
+  const handleLaunch = async () => {
     try {
+      const storedCategories = sessionStorage.getItem("onboarding_categories");
       const storedCompanies = sessionStorage.getItem("onboarding_companies");
+      const storedRatings = sessionStorage.getItem("onboarding_ratings");
+      const storedDuration = sessionStorage.getItem("onboarding_duration");
+
+      const targetCategories = storedCategories ? JSON.parse(storedCategories) : ["maang", "product"];
+      const targetCompanies = storedCompanies ? JSON.parse(storedCompanies) : ["google", "amazon"];
+      const topicRatings = storedRatings ? JSON.parse(storedRatings) : {};
+      const prepDurationWeeks = storedDuration ? parseInt(storedDuration, 10) : 12;
+
+      const clerkUserId = user?.id;
+      const userEmail = user?.primaryEmailAddress?.emailAddress || "student@newtonschool.co";
+      const userName = user?.fullName || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || userEmail.split("@")[0];
+
+      // Save onboarding data to MongoDB Atlas dynamically from Clerk profile
+      await saveStudentOnboarding({
+        clerkUserId,
+        email: userEmail,
+        name: userName,
+        targetCategories,
+        targetCompanies,
+        prepDurationWeeks,
+        topicRatings,
+      });
+
       if (storedCompanies) {
         const companies: string[] = JSON.parse(storedCompanies);
         const companyData: Record<string, { name: string; initial: string; color: string }> = {
@@ -37,7 +63,9 @@ export default function Step4() {
       sessionStorage.setItem("has_onboarded", "true");
       document.cookie = "has_onboarded=true; path=/; max-age=31536000";
       document.cookie = "student_authed=true; path=/; max-age=31536000";
-    } catch { /* sessionStorage might not be available */ }
+    } catch (err) {
+      console.warn("Failed to persist onboarding data:", err);
+    }
     router.push("/dashboard");
   };
 

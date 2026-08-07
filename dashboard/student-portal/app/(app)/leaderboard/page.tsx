@@ -1,21 +1,61 @@
+"use client";
+import { useState, useEffect } from "react";
 import { TrendingUp, Zap, Medal, ChevronDown, Search, Trophy } from "lucide-react";
 import Link from "next/link";
+import { fetchLeaderboard } from "@/lib/api";
 
-const leaders = [
-  { rank: 1,   initials: "MC", name: "Michael Chen",       xp: 18900, change: "—",   time: "5 mins ago",  isYou: false },
-  { rank: 2,   initials: "SJ", name: "Sarah Jenkins",      xp: 14250, change: "—",   time: "2 hrs ago",   isYou: false },
-  { rank: 3,   initials: "ED", name: "Emily Davis",        xp: 13800, change: "—",   time: "1 day ago",   isYou: false },
-  { rank: 4,   initials: "DK", name: "David Kim",          xp: 12450, change: "↑ 2", time: "2 hrs ago",   isYou: false },
-  { rank: 5,   initials: "AJ", name: "Alex Johnson",       xp: 11920, change: "— 0", time: "5 mins ago",  isYou: true  },
-  { rank: 6,   initials: "RJ", name: "Rachel Jones",       xp: 11100, change: "↓ 1", time: "1 day ago",   isYou: false },
-  { rank: 7,   initials: "MG", name: "Maria Garcia",       xp: 10850, change: "↑ 5", time: "3 hrs ago",   isYou: false },
+const defaultFallback = [
+  { rank: 1, initials: "SS", name: "Sourabh Sarkar", xp: 2450, change: "—", batch: "B.Tech CS 2026", isYou: true, time: "Just now" },
+  { rank: 2, initials: "MC", name: "Michael Chen",   xp: 1890, change: "—", batch: "B.Tech CS 2026", isYou: false, time: "2 hrs ago" },
+  { rank: 3, initials: "SJ", name: "Sarah Jenkins",  xp: 1425, change: "—", batch: "B.Tech CS 2026", isYou: false, time: "1 day ago" },
+  { rank: 4, initials: "ED", name: "Emily Davis",    xp: 1380, change: "↑ 2", batch: "B.Tech CS 2026", isYou: false, time: "2 hrs ago" },
+  { rank: 5, initials: "DK", name: "David Kim",      xp: 1245, change: "—", batch: "B.Tech CS 2026", isYou: false, time: "5 mins ago" },
 ];
 
-const me = leaders.find((u) => u.isYou)!;
-const top3 = leaders.slice(0, 3);
-const rest = leaders.slice(3);
-
 export default function LeaderboardPage() {
+  const [leaders, setLeaders] = useState<any[]>(defaultFallback);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLiveLeaderboard() {
+      try {
+        const data = await fetchLeaderboard();
+        if (data && data.length > 0) {
+          const formatted = data.map((u: any, idx: number) => ({
+            rank: u.rank || idx + 1,
+            name: u.name || "Student",
+            initials: u.name ? u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "ST",
+            xp: u.xp || 0,
+            change: u.change || "—",
+            time: u.time || "Recently",
+            batch: u.batch || "B.Tech CS 2026",
+            isYou: u.name === "Sourabh Sarkar" || idx === 0,
+          }));
+
+          // Merge default fallback if less than 3 students exist
+          while (formatted.length < 3) {
+            const nextIdx = formatted.length;
+            formatted.push({
+              ...defaultFallback[nextIdx],
+              rank: nextIdx + 1,
+            });
+          }
+          setLeaders(formatted);
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch live leaderboard:", err);
+      }
+      setLeaders(defaultFallback);
+      setLoading(false);
+    }
+    loadLiveLeaderboard();
+  }, []);
+
+  const me = leaders.find((u) => u.isYou || u.name === "Sourabh Sarkar") || leaders[0] || defaultFallback[0];
+  const top3 = leaders.slice(0, 3);
+  const rest = leaders.slice(3);
   return (
     <div>
       {/* Hero Banner */}
@@ -90,31 +130,31 @@ export default function LeaderboardPage() {
         <div className="text-center flex flex-col items-center pb-4">
           <Medal className="w-5 h-5 sm:w-7 sm:h-7 text-blue-400 mb-2" />
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-300 flex items-center justify-center text-white text-lg sm:text-xl font-bold border-4 border-blue-200">
-            {top3[1].initials}
+            {top3[1]?.initials || "ST"}
           </div>
           <div className="bg-blue-600 text-white text-[10px] sm:text-xs font-bold w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center -mt-3 ml-8 sm:ml-10">2</div>
-          <div className="text-xs sm:text-sm font-medium text-gray-900 mt-2 truncate max-w-[80px] sm:max-w-none">{top3[1].name}</div>
-          <div className="text-[10px] sm:text-xs text-gray-500 flex items-center justify-center gap-1 mt-1"><Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-blue-500 text-blue-500" /> {top3[1].xp.toLocaleString()}</div>
+          <div className="text-xs sm:text-sm font-medium text-gray-900 mt-2 truncate max-w-[80px] sm:max-w-none">{top3[1]?.name || "Student"}</div>
+          <div className="text-[10px] sm:text-xs text-gray-500 flex items-center justify-center gap-1 mt-1"><Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-blue-500 text-blue-500" /> {(top3[1]?.xp || 0).toLocaleString()}</div>
         </div>
         {/* 1st */}
         <div className="text-center flex flex-col items-center mb-4">
           <Medal className="w-7 h-7 sm:w-9 sm:h-9 text-indigo-500 mb-2" />
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xl sm:text-2xl font-bold border-4 border-indigo-200">
-            {top3[0].initials}
+            {top3[0]?.initials || "ST"}
           </div>
           <div className="bg-indigo-700 text-white text-[10px] sm:text-xs font-bold w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center -mt-3 ml-10 sm:ml-12">1</div>
-          <div className="text-sm sm:text-base font-bold text-gray-900 mt-3 truncate max-w-[90px] sm:max-w-none">{top3[0].name}</div>
-          <div className="text-[10px] sm:text-sm text-indigo-600 font-semibold flex items-center justify-center gap-1 mt-1"><Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-indigo-500 text-indigo-500" /> {top3[0].xp.toLocaleString()}</div>
+          <div className="text-sm sm:text-base font-bold text-gray-900 mt-3 truncate max-w-[90px] sm:max-w-none">{top3[0]?.name || "Student"}</div>
+          <div className="text-[10px] sm:text-sm text-indigo-600 font-semibold flex items-center justify-center gap-1 mt-1"><Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-indigo-500 text-indigo-500" /> {(top3[0]?.xp || 0).toLocaleString()}</div>
         </div>
         {/* 3rd */}
         <div className="text-center flex flex-col items-center pb-4">
           <Medal className="w-5 h-5 sm:w-7 sm:h-7 text-sky-500 mb-2" />
           <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-sky-400 flex items-center justify-center text-white text-lg sm:text-xl font-bold border-4 border-sky-100">
-            {top3[2].initials}
+            {top3[2]?.initials || "ST"}
           </div>
           <div className="bg-sky-500 text-white text-[10px] sm:text-xs font-bold w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center -mt-3 ml-8 sm:ml-10">3</div>
-          <div className="text-xs sm:text-sm font-medium text-gray-900 mt-2 truncate max-w-[80px] sm:max-w-none">{top3[2].name}</div>
-          <div className="text-[10px] sm:text-xs text-gray-500 flex items-center justify-center gap-1 mt-1"><Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-sky-500 text-sky-500" /> {top3[2].xp.toLocaleString()}</div>
+          <div className="text-xs sm:text-sm font-medium text-gray-900 mt-2 truncate max-w-[80px] sm:max-w-none">{top3[2]?.name || "Student"}</div>
+          <div className="text-[10px] sm:text-xs text-gray-500 flex items-center justify-center gap-1 mt-1"><Zap className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-sky-500 text-sky-500" /> {(top3[2]?.xp || 0).toLocaleString()}</div>
         </div>
       </div>
 

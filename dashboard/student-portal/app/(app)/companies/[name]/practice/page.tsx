@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, use } from "react";
+import { useState, useEffect, useMemo, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, Search, X, SearchX, Flame } from "lucide-react";
 import {
@@ -10,6 +10,7 @@ import {
   type Difficulty,
   type RoundType,
 } from "@/lib/mock-data";
+import CompanyLogo from "@/components/ui/CompanyLogo";
 
 const diffBadge = (d: string) =>
   d === "Easy"   ? "bg-green-50 text-green-700 border border-green-200" :
@@ -37,6 +38,31 @@ export default function CompanyPracticePage({
   const intel = getCompanyIntel(slug);
   const activeRoadmap = getUserRoadmapCompanies().find((r) => r.slug === slug);
 
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadBackendQuestions() {
+      setLoading(true);
+      try {
+        const res = await fetch(`http://localhost:5050/api/questions?companySlug=${slug}&limit=100`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json && Array.isArray(json.data) && json.data.length > 0) {
+            setQuestions(json.data);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch questions from backend:", err);
+      }
+      setQuestions(filterQuestions({ company: slug }));
+      setLoading(false);
+    }
+    loadBackendQuestions();
+  }, [slug]);
+
   const [search, setSearch] = useState("");
   const [topic, setTopic] = useState(
     typeof resolvedSearchParams.topic === "string" ? resolvedSearchParams.topic : ""
@@ -46,24 +72,35 @@ export default function CompanyPracticePage({
   const [weekFilter, setWeekFilter] = useState<number | "">("");
 
   const filtered = useMemo(() => {
-    let list = filterQuestions({
-      company: slug,
-      topic: topic || undefined,
-      difficulty: difficulty || undefined,
-      roundType: roundType || undefined,
-      search: search || undefined,
-    });
+    let list = questions;
+
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((item) => item.title?.toLowerCase().includes(q) || item.problemSummary?.toLowerCase().includes(q));
+    }
+    if (topic && topic !== "All") {
+      list = list.filter((item) => {
+        const itemTopic = Array.isArray(item.topics) ? item.topics.join(" ") : (item.topic || "");
+        return itemTopic.toLowerCase().includes(topic.toLowerCase());
+      });
+    }
+    if (difficulty && difficulty !== "All") {
+      list = list.filter((item) => (item.difficulty || item.diff || "").toLowerCase() === difficulty.toLowerCase());
+    }
+    if (roundType && roundType !== "All") {
+      list = list.filter((item) => (item.roundType || "").toLowerCase().includes(roundType.toLowerCase()));
+    }
 
     if (weekFilter !== "" && activeRoadmap) {
       const selectedWeek = activeRoadmap.weeks.find((w) => w.weekNumber === Number(weekFilter));
       if (selectedWeek) {
         const weekQIds = new Set(selectedWeek.questions.map((q) => q.id));
-        list = list.filter((q) => weekQIds.has(q.id));
+        list = list.filter((q) => weekQIds.has(q.id || q._id));
       }
     }
 
     return list;
-  }, [slug, topic, difficulty, roundType, search, weekFilter, activeRoadmap]);
+  }, [questions, topic, difficulty, roundType, search, weekFilter, activeRoadmap]);
 
   const companyBg =
     slug === "google"    ? "bg-blue-600"   :
@@ -88,12 +125,10 @@ export default function CompanyPracticePage({
 
       {/* Company header banner */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 flex items-center gap-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`https://www.google.com/s2/favicons?sz=64&domain=${slug}.com`}
-          alt={intel.name}
-          className="w-12 h-12 rounded-xl shrink-0 object-contain bg-white border border-gray-100 p-1.5"
-          onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+        <CompanyLogo
+          slug={slug}
+          name={intel?.name || slug}
+          className="w-12 h-12 rounded-xl"
         />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-0.5">
@@ -206,48 +241,60 @@ export default function CompanyPracticePage({
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {filtered.map((q, idx) => (
-              <div key={q.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                <span className="text-xs text-gray-400 font-mono w-6 shrink-0">{idx + 1}</span>
+            {filtered.map((q: any, idx: number) => {
+              const title = q.problemSummary || q.title || "Interview Question";
+              const topicStr = Array.isArray(q.topics) && q.topics.length > 0 ? q.topics.join(", ") : (q.topic || "DSA");
+              const diffStr = q.difficulty || q.diff || "Medium";
+              const xpVal = q.xpValue !== undefined ? q.xpValue : (q.xp || 10);
+              const isHotVal = q.isHot !== undefined ? q.isHot : q.hot;
+              const freqPct = q.frequencyScore !== undefined
+                ? Math.round(q.frequencyScore * 100)
+                : (q.frequency || 75);
+              const linkUrl = q.leetcodeUrl || q.sourceUrl;
 
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm text-gray-900 truncate">{q.title}</div>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-xs text-gray-500">{q.topic}</span>
-                    {q.hot && <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5"><Flame className="w-3 h-3 mr-1 inline-block" /> Hot</span>}
-                    {q.frequency && (
-                      <span className="text-xs text-gray-400">Asked in {q.frequency}% of interviews</span>
-                    )}
+              return (
+                <div key={q._id || q.id || title || idx} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                  <span className="text-xs text-gray-400 font-mono w-6 shrink-0">{idx + 1}</span>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm text-gray-900 truncate" title={title}>{title}</div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-gray-500">{topicStr}</span>
+                      {isHotVal && <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5"><Flame className="w-3 h-3 mr-1 inline-block" /> Hot</span>}
+                      {freqPct > 0 && (
+                        <span className="text-xs text-gray-400">Asked in {freqPct}% of interviews</span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Round badge */}
+                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${roundColors[q.roundType] ?? "bg-gray-100 text-gray-700"}`}>
+                    {q.roundType || "Coding"}
+                  </span>
+
+                  {/* Difficulty badge */}
+                  <span className={`text-xs font-semibold rounded-full border px-2.5 py-1 shrink-0 ${diffBadge(diffStr)}`}>
+                    {diffStr}
+                  </span>
+
+                  <span className="text-xs font-bold text-amber-600 shrink-0">+{xpVal} XP</span>
+
+                  {linkUrl ? (
+                    <a
+                      href={linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 shrink-0"
+                      aria-label={`Open ${title}`}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : (
+                    <div className="w-4 shrink-0" />
+                  )}
                 </div>
-
-                {/* Round badge */}
-                <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${roundColors[q.roundType] ?? "bg-gray-100 text-gray-700"}`}>
-                  {q.roundType}
-                </span>
-
-                {/* Difficulty badge */}
-                <span className={`text-xs font-semibold rounded-full border px-2.5 py-1 shrink-0 ${diffBadge(q.diff)}`}>
-                  {q.diff}
-                </span>
-
-                <span className="text-xs font-bold text-amber-600 shrink-0">+{q.xp} XP</span>
-
-                {q.leetcodeUrl ? (
-                  <a
-                    href={q.leetcodeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 shrink-0"
-                    aria-label={`Open ${q.title} on LeetCode`}
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                ) : (
-                  <div className="w-4 shrink-0" />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

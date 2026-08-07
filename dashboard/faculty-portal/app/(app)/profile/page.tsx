@@ -1,16 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Mail, Briefcase, Calendar, MapPin, Building2, User, X } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import { fetchFacultyProfile, updateFacultyProfile } from "@/lib/api";
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
-
-  const realName = isLoaded && user ? (user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Prof. Sharma") : "Prof. Sharma";
-  const realEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || "sharma.p@newtonschool.co") : "sharma.p@newtonschool.co";
-  const realImage = isLoaded && user ? user.imageUrl : undefined;
-  const initials = isLoaded && user && user.firstName ? `${user.firstName[0]}${user.lastName?.[0] || ""}`.toUpperCase() : "PS";
 
   const [profile, setProfile] = useState({
     title: "Senior Faculty, Computer Science Dept.",
@@ -22,13 +18,41 @@ export default function ProfilePage() {
     expertises: ["Data Structures", "Algorithms", "System Design", "Cloud Architecture"],
   });
 
+  const [dbName, setDbName] = useState<string | null>(null);
+
+  const realName = dbName || (isLoaded && user ? (user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Prof. Sharma") : "Prof. Sharma");
+  const realEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || "sharma.p@newtonschool.co") : "sharma.p@newtonschool.co";
+  const realImage = isLoaded && user ? user.imageUrl : undefined;
+  const initials = realName ? realName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "PS";
+
+  useEffect(() => {
+    async function loadLiveFaculty() {
+      if (user?.id || user?.primaryEmailAddress?.emailAddress) {
+        const liveData = await fetchFacultyProfile(user.id, user.primaryEmailAddress?.emailAddress);
+        if (liveData) {
+          if (liveData.name) setDbName(liveData.name);
+          setProfile({
+            title: liveData.title || "Senior Faculty, Computer Science Dept.",
+            experience: liveData.experience || "12+ Years Experience",
+            campus: liveData.campus || "Bangalore Campus",
+            employeeId: liveData.employeeId || "EMP-4092",
+            department: liveData.department || "CS & Engineering",
+            joined: liveData.joined || "Aug 2021",
+            expertises: liveData.expertises || ["Data Structures", "Algorithms", "System Design", "Cloud Architecture"],
+          });
+        }
+      }
+    }
+    loadLiveFaculty();
+  }, [user]);
+
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: realName, email: realEmail, ...profile });
   const [showToast, setShowToast] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setProfile({
+    const updated = {
       title: formData.title,
       experience: formData.experience,
       campus: formData.campus,
@@ -36,7 +60,17 @@ export default function ProfilePage() {
       department: formData.department,
       joined: formData.joined,
       expertises: profile.expertises,
+    };
+    setProfile(updated);
+
+    // Save live faculty profile to MongoDB Atlas
+    await updateFacultyProfile({
+      clerkUserId: user?.id,
+      email: realEmail,
+      name: formData.name,
+      ...updated,
     });
+
     setEditModalOpen(false);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);

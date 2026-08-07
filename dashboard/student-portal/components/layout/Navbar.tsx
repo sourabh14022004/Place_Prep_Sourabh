@@ -25,6 +25,8 @@ function useUnreadCount() {
   return count;
 }
 
+import { fetchStudentProfile } from "@/lib/api";
+
 export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -36,8 +38,21 @@ export default function Navbar() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const unreadCount = useUnreadCount();
 
-  // Derive XP from user metadata (BACKEND TODO: from /api/user/me)
-  const xp = (user?.publicMetadata as { xp?: number })?.xp ?? 2450;
+  const [liveXp, setLiveXp] = useState<number>(2450);
+
+  useEffect(() => {
+    async function loadLiveXp() {
+      if (user?.id || user?.primaryEmailAddress?.emailAddress) {
+        const profile = await fetchStudentProfile(user.id, user.primaryEmailAddress?.emailAddress);
+        if (profile && typeof profile.xp === "number") {
+          setLiveXp(profile.xp);
+        }
+      }
+    }
+    loadLiveXp();
+  }, [user]);
+
+  const xp = liveXp;
 
   // Derive results directly from query — no useEffect needed
   const results = useMemo(() => searchAll(query), [query]);

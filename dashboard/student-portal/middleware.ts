@@ -12,6 +12,7 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
 
+  // Allow public routes and Clerk's cross-domain handshake through unconditionally
   if (isPublicRoute(req)) return;
 
   if (!userId) {
@@ -38,3 +39,4 @@ export const config = {
     "/__clerk/:path*",
   ],
 };
+

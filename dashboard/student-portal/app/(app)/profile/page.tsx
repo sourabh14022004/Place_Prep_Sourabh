@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
  User, Settings, BarChart2, Bell,
  Edit2, Flame, RotateCcw, Trash2, AlertTriangle,
@@ -731,17 +731,28 @@ function SettingsTab({ email, onLogout }: { email: string; onLogout: () => void 
 
 
 // ── Main Profile Page ─────────────────────────────────
+import { fetchStudentProfile } from "@/lib/api";
+
 export default function ProfilePage() {
  const [activeTab, setActiveTab] = useState<Tab>("overview");
- const { signOut } = useClerk();
  const { user: clerkUser, isLoaded } = useUser();
+ const { signOut } = useClerk();
+ const [liveProfile, setLiveProfile] = useState<any>(null);
 
- const realName = isLoaded && clerkUser ? (clerkUser.fullName || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Student User") : mockUser.name;
- const realEmail = isLoaded && clerkUser ? (clerkUser.primaryEmailAddress?.emailAddress || mockUser.email) : mockUser.email;
+ useEffect(() => {
+  async function loadLiveProfile() {
+   if (clerkUser?.id || clerkUser?.primaryEmailAddress?.emailAddress) {
+    const data = await fetchStudentProfile(clerkUser.id, clerkUser.primaryEmailAddress?.emailAddress);
+    if (data) setLiveProfile(data);
+   }
+  }
+  loadLiveProfile();
+ }, [clerkUser]);
+
+ const realName = isLoaded && clerkUser ? (clerkUser.fullName || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || mockUser.name) : (liveProfile?.name || mockUser.name);
+ const realEmail = isLoaded && clerkUser ? (clerkUser.primaryEmailAddress?.emailAddress || mockUser.email) : (liveProfile?.email || mockUser.email);
  const realImage = isLoaded && clerkUser ? clerkUser.imageUrl : undefined;
- const initials = isLoaded && clerkUser && clerkUser.firstName
-  ? `${clerkUser.firstName[0]}${clerkUser.lastName?.[0] || ""}`.toUpperCase()
-  : mockUser.initials;
+ const initials = realName ? realName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "SS";
 
  const userProfile = {
   ...mockUser,
@@ -749,6 +760,11 @@ export default function ProfilePage() {
   email: realEmail,
   imageUrl: realImage,
   initials: initials,
+  xp: liveProfile?.xp ?? mockUser.xp,
+  streak: liveProfile?.streakDays ?? mockUser.streak,
+  targetCompanies: liveProfile?.targetCompanies && liveProfile.targetCompanies.length > 0
+   ? liveProfile.targetCompanies.map((c: string) => c.charAt(0).toUpperCase() + c.slice(1))
+   : mockUser.targetCompanies,
  };
 
  const handleLogout = async () => {

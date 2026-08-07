@@ -1,8 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { Code2, Monitor, Brain, BarChart2, Cloud, Layers, CheckCircle } from "lucide-react";
 import Stepper from "@/components/onboarding/Stepper";
+import { fetchStudentProfile } from "@/lib/api";
 
 const domains = [
   { icon: Code2,    label: "SDE / Software Engineering" },
@@ -16,6 +18,29 @@ const domains = [
 export default function Step1() {
   const [selected, setSelected] = useState<string[]>([]);
   const router = useRouter();
+  const { user } = useUser();
+
+  useEffect(() => {
+    async function checkAlreadyOnboarded() {
+      try {
+        const sessionOnboarded = sessionStorage.getItem("has_onboarded") === "true";
+        const cookieOnboarded = document.cookie.split("; ").some((c) => c.startsWith("has_onboarded=true"));
+        if (sessionOnboarded || cookieOnboarded) {
+          router.replace("/dashboard");
+          return;
+        }
+        if (user?.id || user?.primaryEmailAddress?.emailAddress) {
+          const profile = await fetchStudentProfile(user.id, user.primaryEmailAddress?.emailAddress);
+          if (profile?.hasOnboarded) {
+            sessionStorage.setItem("has_onboarded", "true");
+            document.cookie = "has_onboarded=true; path=/; max-age=31536000";
+            router.replace("/dashboard");
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    checkAlreadyOnboarded();
+  }, [user, router]);
 
   const toggle = (label: string) => {
     setSelected((s) => s.includes(label) ? s.filter((x) => x !== label) : [...s, label]);

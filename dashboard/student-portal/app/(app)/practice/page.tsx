@@ -82,6 +82,25 @@ function PracticeContent() {
     (searchParams.get("difficulty") as Difficulty) ?? ""
   );
 
+  const [backendQuestions, setBackendQuestions] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadLiveQuestions() {
+      try {
+        const res = await fetch("http://localhost:5050/api/questions?limit=500");
+        if (res.ok) {
+          const json = await res.json();
+          if (json && Array.isArray(json.data) && json.data.length > 0) {
+            setBackendQuestions(json.data);
+          }
+        }
+      } catch (err) {
+        console.warn("Backend unavailable for global practice questions:", err);
+      }
+    }
+    loadLiveQuestions();
+  }, []);
+
   // Sync URL when category changes
   useEffect(() => {
     if (activeCategory) {
@@ -101,15 +120,37 @@ function PracticeContent() {
   // Filter questions based on active category + user filters
   const filteredQuestions = useMemo(() => {
     if (!activeCat) return [];
-    const qs = filterQuestions({
-      company: company || undefined,
-      topic: topic || undefined,
-      difficulty: difficulty || undefined,
-      search: search || undefined,
-    });
+    let qs = backendQuestions.length > 0
+      ? backendQuestions
+      : filterQuestions({
+          company: company || undefined,
+          topic: topic || undefined,
+          difficulty: difficulty || undefined,
+          search: search || undefined,
+        });
+
+    if (search) {
+      const s = search.toLowerCase();
+      qs = qs.filter((q) => (q.title || q.problemSummary || "").toLowerCase().includes(s));
+    }
+    if (company && company !== "All") {
+      const c = company.toLowerCase();
+      qs = qs.filter((q) => (q.companySlug || "").toLowerCase().includes(c) || (q.companyName || "").toLowerCase().includes(c));
+    }
+    if (topic && topic !== "All") {
+      const t = topic.toLowerCase();
+      qs = qs.filter((q) => {
+        const qTopic = Array.isArray(q.topics) ? q.topics.join(" ") : (q.topic || "");
+        return qTopic.toLowerCase().includes(t);
+      });
+    }
+    if (difficulty && difficulty !== "All") {
+      qs = qs.filter((q) => (q.difficulty || q.diff || "").toLowerCase() === difficulty.toLowerCase());
+    }
+
     // Keep only questions matching this category's roundTypes
-    return qs.filter((q) => activeCat.roundTypes.includes(q.roundType));
-  }, [activeCat, company, topic, difficulty, search]);
+    return qs.filter((q) => activeCat.roundTypes.includes(q.roundType || "Coding"));
+  }, [activeCat, backendQuestions, company, topic, difficulty, search]);
 
   const handleSelectCategory = (id: string) => {
     setActiveCategory((prev) => (prev === id ? null : id));
@@ -243,53 +284,62 @@ function PracticeContent() {
             </div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {filteredQuestions.map((q, idx) => (
-                <div
-                  key={q.id}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors"
-                >
-                  <span className="text-xs text-gray-400 font-mono w-6 shrink-0">{idx + 1}</span>
+              {filteredQuestions.map((q: any, idx: number) => {
+                const title = q.problemSummary || q.title || "Interview Question";
+                const topicStr = Array.isArray(q.topics) && q.topics.length > 0 ? q.topics.join(", ") : (q.topic || "DSA");
+                const diffStr = q.difficulty || q.diff || "Medium";
+                const xpVal = q.xpValue !== undefined ? q.xpValue : (q.xp || 10);
+                const isHotVal = q.isHot !== undefined ? q.isHot : q.hot;
+                const linkUrl = q.leetcodeUrl || q.sourceUrl;
 
-                  {/* Title */}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900 truncate">{q.title}</div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-gray-500">{q.topic}</span>
-                      {q.companies.slice(0, 2).map((co) => (
-                        <span key={co} className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">
-                          {co}
-                        </span>
-                      ))}
-                      {q.hot && (
-                        <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5"><Flame className="w-3 h-3 mr-1 inline-block" /> Hot</span>
-                      )}
+                return (
+                  <div
+                    key={q._id || q.id || title || idx}
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors"
+                  >
+                    <span className="text-xs text-gray-400 font-mono w-6 shrink-0">{idx + 1}</span>
+
+                    {/* Title */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900 truncate" title={title}>{title}</div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-xs text-gray-500">{topicStr}</span>
+                        {(Array.isArray(q.companies) ? q.companies : [q.companySlug || q.companyName]).filter(Boolean).slice(0, 2).map((co: string, cIdx: number) => (
+                          <span key={co || cIdx} className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">
+                            {co}
+                          </span>
+                        ))}
+                        {isHotVal && (
+                          <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5"><Flame className="w-3 h-3 mr-1 inline-block" /> Hot</span>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Difficulty badge */}
+                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${diffBadge(diffStr)}`}>
+                      {diffStr}
+                    </span>
+
+                    {/* XP */}
+                    <span className="text-xs font-bold text-amber-600 shrink-0">+{xpVal} XP</span>
+
+                    {/* Link */}
+                    {linkUrl ? (
+                      <a
+                        href={linkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 shrink-0"
+                        aria-label={`Open ${title}`}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    ) : (
+                      <div className="w-4 shrink-0" />
+                    )}
                   </div>
-
-                  {/* Difficulty badge */}
-                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${diffBadge(q.diff)}`}>
-                    {q.diff}
-                  </span>
-
-                  {/* XP */}
-                  <span className="text-xs font-bold text-amber-600 shrink-0">+{q.xp} XP</span>
-
-                  {/* LeetCode link */}
-                  {q.leetcodeUrl ? (
-                    <a
-                      href={q.leetcodeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 shrink-0"
-                      aria-label={`Open ${q.title} on LeetCode`}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  ) : (
-                    <div className="w-4 shrink-0" />
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

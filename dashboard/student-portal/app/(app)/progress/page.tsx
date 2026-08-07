@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { TrendingUp, Flame, Trophy, Zap, AlertCircle } from "lucide-react";
+import CompanyLogo from "@/components/ui/CompanyLogo";
 import { getUserRoadmapCompanies } from "@/lib/mock-data";
 
 const companyReadiness = [
@@ -152,12 +153,9 @@ export default function ProgressPage() {
                 <tr key={co.name} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`https://www.google.com/s2/favicons?sz=64&domain=${co.name.toLowerCase()}.com`}
-                        alt={co.name}
-                        className="w-7 h-7 rounded shrink-0 object-contain bg-white border border-gray-100 p-0.5"
-                        onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+                      <CompanyLogo
+                        name={co.name}
+                        className="w-7 h-7 rounded shrink-0"
                       />
                       <span className="font-medium text-gray-900">{co.name}</span>
                     </div>

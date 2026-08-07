@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Search, ChevronRight, Plus, Check, XCircle } from "lucide-react";
 import { companiesList, getUserRoadmapCompanies } from "@/lib/mock-data";
 import AddToRoadmapModal from "@/components/modals/AddToRoadmapModal";
+import CompanyLogo from "@/components/ui/CompanyLogo";
 
 const FILTERS = ["All", "FAANG", "Indian Product", "Indian Startup", "Service"] as const;
 type Filter = typeof FILTERS[number];
@@ -16,27 +17,59 @@ const filterMap: Record<Filter, string[]> = {
   "Service":         ["Service"],
 };
 
+import { fetchCompanies } from "@/lib/api";
+
 export default function CompaniesPage() {
+  const [companies, setCompanies] = useState<any[]>(companiesList);
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [search, setSearch] = useState("");
   const [roadmapSlugs, setRoadmapSlugs] = useState<string[]>([]);
-  const [modalCompany, setModalCompany] = useState<typeof companiesList[number] | null>(null);
+  const [modalCompany, setModalCompany] = useState<any | null>(null);
   const [showLimitToast, setShowLimitToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Read which companies are already in roadmap using the dynamic helper
+  // Fetch live companies from Express backend on mount
   useEffect(() => {
-    // Need timeout to let component mount since mock-data accesses sessionStorage
+    async function loadBackendCompanies() {
+      try {
+        const data = await fetchCompanies();
+        if (data && data.length > 0) {
+          // Normalize fields from backend (e.g. tier/category/type, questions/questionCount)
+          const normalized = data.map((c: any) => ({
+            name: c.name || "Company",
+            slug: c.slug || c.name?.toLowerCase().replace(/\s+/g, "") || "company",
+            type: c.category || c.tier || c.type || "Product",
+            questions: c.questionCount || c.questions || Math.floor(Math.random() * 500) + 100,
+            topTopic: c.topTopic || (c.topTopics && c.topTopics[0]?.topic) || "DSA & System Design",
+            tier: c.tier || "Product",
+            ...c,
+          }));
+          setCompanies(normalized);
+        }
+      } catch (err) {
+        console.warn("Failed to load live companies from backend:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadBackendCompanies();
+  }, []);
+
+  // Read which companies are already in roadmap
+  useEffect(() => {
     setTimeout(() => {
       const activeRoadmaps = getUserRoadmapCompanies();
       setRoadmapSlugs(activeRoadmaps.map((r) => r.slug));
     }, 0);
   }, []);
 
-  const filtered = companiesList.filter((c) => {
+  const filtered = companies.filter((c) => {
+    const cType = (c.type || c.tier || c.category || "").toLowerCase();
     const matchesFilter =
-      activeFilter === "All" || filterMap[activeFilter].includes(c.type);
+      activeFilter === "All" ||
+      filterMap[activeFilter].some((f) => cType.includes(f.toLowerCase()) || (f === "FAANG" && cType.includes("maang")));
     const matchesSearch =
-      !search.trim() || c.name.toLowerCase().includes(search.toLowerCase());
+      !search.trim() || c.name.toLowerCase().includes(search.toLowerCase()) || (c.slug && c.slug.toLowerCase().includes(search.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
 
@@ -106,12 +139,11 @@ export default function CompaniesPage() {
               >
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`https://www.google.com/s2/favicons?sz=64&domain=${co.slug.toLowerCase()}.com`}
-                    alt={co.name}
-                    className="w-10 h-10 rounded-lg shrink-0 object-contain bg-white border border-gray-100 p-1"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+                  <CompanyLogo
+                    logoUrl={co.logoUrl}
+                    slug={co.slug}
+                    name={co.name}
+                    className="w-10 h-10 rounded-lg"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-900 text-sm truncate">{co.name}</div>
@@ -170,7 +202,7 @@ export default function CompaniesPage() {
 
       {/* Summary */}
       <p className="text-xs text-gray-400 mt-6 text-center">
-        Showing {filtered.length} of {companiesList.length} companies
+        Showing {filtered.length} of {companies.length} companies
       </p>
 
       {/* Add to Roadmap Modal */}

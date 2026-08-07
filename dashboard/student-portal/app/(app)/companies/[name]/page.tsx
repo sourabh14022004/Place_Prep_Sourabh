@@ -1,5 +1,5 @@
 "use client";
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import {
   BarChart2, Target, Layers, TrendingUp, ChevronRight,
@@ -12,6 +12,8 @@ import {
   Legend, CartesianGrid,
 } from "recharts";
 import { getCompanyIntel, getCompanyBg, type RoundGroup, type Question } from "@/lib/mock-data";
+import { fetchCompanyIntel } from "@/lib/api";
+import CompanyLogo from "@/components/ui/CompanyLogo";
 
 const TABS = ["Overview", "Questions", "Experiences", "Trends"] as const;
 type Tab = typeof TABS[number];
@@ -126,8 +128,31 @@ function QuestionRow({ q }: { q: Question }) {
 // ─── Main Company Page ────────────────────────────────────────────
 export default function CompanyPage({ params }: { params: Promise<{ name: string }> }) {
   const { name: slug } = use(params);
-  const intel = getCompanyIntel(slug);
+  const [intel, setIntel] = useState<any>(() => getCompanyIntel(slug));
   const bg = getCompanyBg(slug);
+
+  useEffect(() => {
+    async function loadBackendIntel() {
+      try {
+        const data = await fetchCompanyIntel(slug);
+        if (data) {
+          setIntel((prev: any) => ({
+            ...prev,
+            ...data,
+            roundStructure: data.roundStructure || prev.roundStructure || [],
+            topTopics: data.topTopics || prev.topTopics || [],
+            hiringStatus: data.hiringStatus || prev.hiringStatus || "Active Hiring",
+            avgSalary: data.avgSalary || prev.avgSalary || "₹28 LPA",
+            avgProcess: data.avgProcess || prev.avgProcess || "3-4 Weeks",
+            difficulty: data.difficulty || prev.difficulty || "8.5/10",
+          }));
+        }
+      } catch (err) {
+        console.warn("Failed to fetch live intel from backend:", err);
+      }
+    }
+    loadBackendIntel();
+  }, [slug]);
 
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [role, setRole] = useState("SDE-1 (L3)");
@@ -135,8 +160,8 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
   const displayName = intel.name || (slug.charAt(0).toUpperCase() + slug.slice(1));
   const initial = displayName.charAt(0);
 
-  const totalQuestionCount = intel.roundQuestions.reduce(
-    (acc, g) => acc + g.questions.length, 0
+  const totalQuestionCount = (intel.roundQuestions || []).reduce(
+    (acc: number, g: any) => acc + (g.questions ? g.questions.length : 0), 0
   );
 
   return (
@@ -154,12 +179,11 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-start gap-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`https://www.google.com/s2/favicons?sz=64&domain=${slug}.com`}
-              alt={displayName}
-              className="w-14 h-14 rounded-xl shrink-0 object-contain bg-white border border-gray-100 p-1.5"
-              onError={(e) => { (e.target as HTMLImageElement).src = "https://www.google.com/s2/favicons?sz=64&domain=example.com"; }}
+            <CompanyLogo
+              logoUrl={intel.logoUrl}
+              slug={slug}
+              name={displayName}
+              className="w-14 h-14 rounded-xl"
             />
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
@@ -270,21 +294,26 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
           <div className="col-span-3 bg-white border border-gray-200 rounded-xl p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Standard Round Structure</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {intel.roundStructure.map((r) => (
-                <div key={r.n} className="border border-gray-200 rounded-xl p-4 text-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mx-auto mb-3 ${
-                      r.n === intel.roundStructure.length
-                        ? "bg-slate-100 text-slate-700"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {r.n}
+              {(intel.roundStructure || []).map((r: any, idx: number) => {
+                const roundNum = r.n || r.roundNumber || (idx + 1);
+                const roundName = r.name || r.roundName || `Round ${roundNum}`;
+                const roundDur = r.dur || (r.typicalDurationMin ? `${r.typicalDurationMin} mins` : (r.description || "45 mins"));
+                return (
+                  <div key={r.n || r.roundNumber || r.roundName || idx} className="border border-gray-200 rounded-xl p-4 text-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold mx-auto mb-3 ${
+                        roundNum === (intel.roundStructure || []).length
+                          ? "bg-slate-100 text-slate-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {roundNum}
+                    </div>
+                    <div className="text-sm font-medium text-gray-900">{roundName}</div>
+                    <div className="text-xs text-gray-500 mt-1 line-clamp-1">{roundDur}</div>
                   </div>
-                  <div className="text-sm font-medium text-gray-900">{r.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">{r.dur}</div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -316,20 +345,24 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <h3 className="font-semibold text-gray-900 mb-4">Top Topics</h3>
             <div className="space-y-2.5">
-              {intel.topTopics.map((t) => (
-                <div key={t.topic}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-700">{t.topic}</span>
-                    <span className="text-gray-500">{t.pct}%</span>
+              {(intel.topTopics || []).map((t: any, idx: number) => {
+                const topicName = t.topic || t.topicName || `Topic ${idx + 1}`;
+                const pct = t.pct !== undefined ? t.pct : (t.frequencyPct || 50);
+                return (
+                  <div key={t.topic || t.topicName || idx}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-700">{topicName}</span>
+                      <span className="text-gray-500">{pct}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full">
+                      <div
+                        className="h-2 bg-blue-500 rounded-full"
+                        style={{ width: `${Math.min(pct, 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full">
-                    <div
-                      className="h-2 bg-blue-500 rounded-full"
-                      style={{ width: `${Math.min(t.pct, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -350,10 +383,10 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
               </div>
             </div>
             <div className="flex justify-center gap-4 mt-3 text-xs">
-              {intel.difficultyBreakdown.map((d) => (
-                <div key={d.name} className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
-                  <span className="text-gray-600">{d.name} ({d.value}%)</span>
+              {(intel.difficultyBreakdown || []).map((d: any, idx: number) => (
+                <div key={d.name || idx} className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full" style={{ background: d.color || "#3B82F6" }} />
+                  <span className="text-gray-600">{d.name || "Level"} ({d.value || 0}%)</span>
                 </div>
               ))}
             </div>
@@ -371,8 +404,8 @@ export default function CompanyPage({ params }: { params: Promise<{ name: string
               </button>
             </div>
             <div className="space-y-0">
-              {intel.sampleQuestions.map((q) => (
-                <QuestionRow key={q.id} q={q} />
+              {(intel.sampleQuestions || []).map((q: any, idx: number) => (
+                <QuestionRow key={q._id || q.id || q.title || idx} q={q} />
               ))}
             </div>
           </div>
