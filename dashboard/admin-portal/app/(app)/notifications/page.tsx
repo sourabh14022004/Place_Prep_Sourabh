@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Bell, Check, CheckCheck, AlertTriangle, Info, Send, GraduationCap, Users, Globe } from "lucide-react";
-import { mockNotifications, mockSentNotifications } from "@/lib/mock-data";
-import type { Notification, SentNotification } from "@/lib/types";
+import { toast } from "sonner";
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 const TARGET_OPTIONS = [
   { value: "students", label: "All Students", icon: GraduationCap, desc: "Sent to every student on the platform" },
@@ -14,44 +16,73 @@ const TARGET_OPTIONS = [
 type Target = typeof TARGET_OPTIONS[number]["value"];
 
 export default function NotificationsPage() {
-  // Inbox notifications
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  // Admin inbox — real API via SWR
+  const { data: notifsData, mutate: mutateNotifs, isLoading: notifsLoading } = useSWR('/api/admin/notifications', fetcher);
+  const notifications = notifsData?.data?.notifications ?? notifsData?.notifications ?? [];
+  const unreadCount = notifications.filter((n: any) => !n.isRead).length;
 
-  const markAsRead = (id: number) =>
-    setNotifications(notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-  const markAllAsRead = () =>
-    setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+  const markAsRead = async (id: string) => {
+    try {
+      await fetch(`/api/admin/notifications/${id}`, { method: 'PATCH' });
+      mutateNotifs();
+    } catch { toast.error('Could not mark as read.'); }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      await fetch('/api/admin/notifications/read-all', { method: 'POST' });
+      mutateNotifs();
+    } catch { toast.error('Could not mark all as read.'); }
+  };
+
+  const formatTime = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  };
 
   // Compose state
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [target, setTarget] = useState<Target>("students");
   const [sending, setSending] = useState(false);
-  const [sentLog, setSentLog] = useState<SentNotification[]>(mockSentNotifications);
+  const [sentLog, setSentLog] = useState<Array<{ title: string; target: string; sentAt: string; recipientCount: number }>>([]);
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) return;
     setSending(true);
-    await new Promise((r) => setTimeout(r, 800)); // simulate API call
-    const newItem: SentNotification = {
-      id: Date.now(),
-      title: title.trim(),
-      message: message.trim(),
-      target,
-      sentAt: new Date().toISOString(),
-      status: "sent",
-    };
-    setSentLog([newItem, ...sentLog]);
-    setTitle("");
-    setMessage("");
-    setSending(false);
+    try {
+      const res = await fetch('/api/admin/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim(), subtitle: message.trim(), targetAudience: target }),
+      });
+      if (!res.ok) throw new Error('Send failed');
+      const json = await res.json();
+      const recipientCount = json?.data?.recipientCount ?? json?.recipientCount ?? 0;
+      toast.success(`Notification sent to ${target === 'all' ? 'everyone' : target}.`);
+      setSentLog(prev => [{ title: title.trim(), target, sentAt: new Date().toISOString(), recipientCount }, ...prev].slice(0, 20));
+      setTitle('');
+      setMessage('');
+    } catch {
+      toast.error('Could not send notification.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const getIcon = (type: string) => {
     switch (type) {
       case "alert": return <AlertTriangle className="w-4 h-4 text-amber-500" />;
       case "success": return <CheckCheck className="w-4 h-4 text-emerald-500" />;
+      case "session": return <CheckCheck className="w-4 h-4 text-blue-500" />;
       default: return <Info className="w-4 h-4 text-blue-500" />;
     }
   };
@@ -151,8 +182,10 @@ export default function NotificationsPage() {
           <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
             <h3 className="text-xs font-semibold text-gray-700 mb-3">Sent Notifications</h3>
             <div className="space-y-3">
-              {sentLog.map((n) => (
-                <div key={n.id} className="border-b border-gray-50 pb-3 last:border-0 last:pb-0">
+              {sentLog.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-4">No notifications sent yet this session.</p>
+              ) : sentLog.map((n, i) => (
+                <div key={i} className="border-b border-gray-50 pb-3 last:border-0 last:pb-0">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-semibold text-gray-800 leading-snug">{n.title}</p>
                     <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
@@ -160,15 +193,18 @@ export default function NotificationsPage() {
                       n.target === "faculty" ? "bg-emerald-50 text-emerald-600" :
                       "bg-purple-50 text-purple-600"
                     }`}>
-                      {targetLabel[n.target]}
+                      {targetLabel[n.target as Target] ?? n.target}
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                  {n.recipientCount != null && (
+                    <p className="text-[10px] text-gray-500 mt-0.5">{n.recipientCount} recipients</p>
+                  )}
                   <p className="text-[10px] text-gray-300 mt-1">{formatSentTime(n.sentAt)}</p>
                 </div>
               ))}
             </div>
           </div>
+
         </div>
 
         {/* ─── RIGHT: Inbox (60%) ─── */}
@@ -192,16 +228,30 @@ export default function NotificationsPage() {
               )}
             </div>
 
-            {notifications.length === 0 ? (
+            {notifsLoading ? (
+              // Skeleton loader — matches notification row layout
+              <div className="divide-y divide-gray-50">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="px-4 py-3 flex items-start gap-3 animate-pulse">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 bg-gray-200 rounded w-3/5" />
+                      <div className="h-3 bg-gray-100 rounded w-4/5" />
+                      <div className="h-2.5 bg-gray-100 rounded w-1/4 mt-1" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="p-12 text-center">
                 <Bell className="w-8 h-8 text-gray-200 mx-auto mb-3" />
                 <p className="text-sm text-gray-400">No notifications.</p>
               </div>
             ) : (
               <ul className="divide-y divide-gray-50">
-                {notifications.map((n) => (
+                {notifications.map((n: any) => (
                   <li
-                    key={n.id}
+                    key={n._id ?? n.id}
                     className={`px-4 py-3 transition-colors ${!n.isRead ? "bg-blue-50/40 hover:bg-blue-50/60" : "hover:bg-gray-50"}`}
                   >
                     <div className="flex items-start gap-3">
@@ -212,12 +262,12 @@ export default function NotificationsPage() {
                         <h3 className={`text-xs mb-0.5 ${!n.isRead ? "font-semibold text-gray-900" : "font-medium text-gray-600"}`}>
                           {n.title}
                         </h3>
-                        <p className="text-xs text-gray-500 leading-relaxed">{n.message}</p>
-                        <span className="text-[10px] text-gray-400 mt-1 block">{n.time}</span>
+                        <p className="text-xs text-gray-500 leading-relaxed">{n.subtitle ?? n.message ?? ''}</p>
+                        <span className="text-[10px] text-gray-400 mt-1 block">{formatTime(n.createdAt ?? n.time)}</span>
                       </div>
                       {!n.isRead && (
                         <button
-                          onClick={() => markAsRead(n.id)}
+                          onClick={() => markAsRead(n._id ?? n.id)}
                           className="p-1.5 rounded-lg hover:bg-white text-gray-300 hover:text-blue-600 transition-colors shrink-0"
                           title="Mark as read"
                         >
@@ -226,6 +276,7 @@ export default function NotificationsPage() {
                       )}
                     </div>
                   </li>
+
                 ))}
               </ul>
             )}

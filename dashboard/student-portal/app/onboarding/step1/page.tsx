@@ -1,10 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
 import { Code2, Monitor, Brain, BarChart2, Cloud, Layers, CheckCircle } from "lucide-react";
 import Stepper from "@/components/onboarding/Stepper";
-import { fetchStudentProfile } from "@/lib/api";
 
 const domains = [
   { icon: Code2,    label: "SDE / Software Engineering" },
@@ -18,29 +16,6 @@ const domains = [
 export default function Step1() {
   const [selected, setSelected] = useState<string[]>([]);
   const router = useRouter();
-  const { user } = useUser();
-
-  useEffect(() => {
-    async function checkAlreadyOnboarded() {
-      try {
-        const sessionOnboarded = sessionStorage.getItem("has_onboarded") === "true";
-        const cookieOnboarded = document.cookie.split("; ").some((c) => c.startsWith("has_onboarded=true"));
-        if (sessionOnboarded || cookieOnboarded) {
-          router.replace("/dashboard");
-          return;
-        }
-        if (user?.id || user?.primaryEmailAddress?.emailAddress) {
-          const profile = await fetchStudentProfile(user.id, user.primaryEmailAddress?.emailAddress);
-          if (profile?.hasOnboarded) {
-            sessionStorage.setItem("has_onboarded", "true");
-            document.cookie = "has_onboarded=true; path=/; max-age=31536000";
-            router.replace("/dashboard");
-          }
-        }
-      } catch { /* ignore */ }
-    }
-    checkAlreadyOnboarded();
-  }, [user, router]);
 
   const toggle = (label: string) => {
     setSelected((s) => s.includes(label) ? s.filter((x) => x !== label) : [...s, label]);
@@ -76,7 +51,7 @@ export default function Step1() {
             <span className="font-bold text-gray-900 text-sm">PlacePrep</span>
           </div>
 
-          <Stepper currentStep={1} totalSteps={4} />
+          <Stepper currentStep={1} totalSteps={5} />
           <p className="text-xs text-gray-400 mt-2 mb-5">Step 1 of 4</p>
           <h1 className="text-xl font-bold text-gray-900 mb-1">What are you preparing for?</h1>
           <p className="text-sm text-gray-500 mb-5">Select all domains you want to cover</p>
@@ -99,7 +74,14 @@ export default function Step1() {
           </div>
 
           <button
-            onClick={() => selected.length > 0 && router.push("/onboarding/step2")}
+            onClick={() => {
+              if (selected.length > 0) {
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("onboarding_domains", JSON.stringify(selected));
+                }
+                router.push("/onboarding/step2");
+              }
+            }}
             disabled={selected.length === 0}
             className={`w-full py-3 rounded-lg text-sm font-semibold transition-colors ${selected.length > 0 ? "bg-gray-900 text-white hover:bg-gray-800" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
           >

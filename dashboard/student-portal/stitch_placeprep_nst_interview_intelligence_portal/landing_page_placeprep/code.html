@@ -1,392 +1,275 @@
-<!doctype html>
+<!DOCTYPE html>
 
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>PlacePrep - Crack Your Dream Company Interview</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-      rel="stylesheet"
-    />
-    <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              "surface-container-highest": "#e1e3e4",
-              "on-secondary-container": "#fefcff",
-              "tertiary-fixed": "#ffddb8",
-              tertiary: "#000000",
-              "on-primary-fixed": "#141b2b",
-              "on-primary-container": "#7d8497",
-              "on-secondary": "#ffffff",
-              "tertiary-container": "#2a1700",
-              secondary: "#0058be",
-              "surface-container-low": "#f3f4f5",
-              "tertiary-fixed-dim": "#ffb95f",
-              "surface-container-lowest": "#ffffff",
-              "on-secondary-fixed-variant": "#004395",
-              "primary-fixed": "#dce2f7",
-              surface: "#f8f9fa",
-              "on-tertiary-container": "#b87500",
-              "outline-variant": "#c6c6cd",
-              "primary-container": "#141b2b",
-              "inverse-on-surface": "#f0f1f2",
-              primary: "#000000",
-              "secondary-container": "#2170e4",
-              "on-error": "#ffffff",
-              "primary-fixed-dim": "#c0c6db",
-              "on-surface-variant": "#45464c",
-              "inverse-surface": "#2e3132",
-              "on-error-container": "#93000a",
-              outline: "#76777d",
-              "on-surface": "#191c1d",
-              "on-tertiary": "#ffffff",
-              "on-tertiary-fixed-variant": "#653e00",
-              "surface-container": "#edeeef",
-              "on-tertiary-fixed": "#2a1700",
-              "secondary-fixed": "#d8e2ff",
-              "surface-tint": "#575e70",
-              "on-primary": "#ffffff",
-              "surface-dim": "#d9dadb",
-              "inverse-primary": "#c0c6db",
-              "on-secondary-fixed": "#001a42",
-              "on-background": "#191c1d",
-              "error-container": "#ffdad6",
-              error: "#ba1a1a",
-              "surface-variant": "#e1e3e4",
-              "secondary-fixed-dim": "#adc6ff",
-              "surface-container-high": "#e7e8e9",
-              "surface-bright": "#f8f9fa",
-              "on-primary-fixed-variant": "#404758",
-              background: "#f8f9fa",
-            },
-            borderRadius: {
-              DEFAULT: "0.125rem",
-              lg: "0.25rem",
-              xl: "0.5rem",
-              full: "0.75rem",
-            },
-            spacing: {
-              container_padding: "24px",
-              sidebar_width: "216px",
-              gutter: "16px",
-              right_panel_width: "280px",
-              navbar_height: "56px",
-            },
-            fontFamily: {
-              h1: ["Inter"],
-              "card-title": ["Inter"],
-              "table-header": ["Inter"],
-              "ui-medium": ["Inter"],
-              "body-sm": ["Inter"],
-              subheading: ["Inter"],
-            },
-            fontSize: {
-              h1: [
-                "24px",
-                {
-                  lineHeight: "32px",
-                  fontWeight: "600",
-                },
-              ],
-              "card-title": [
-                "16px",
-                {
-                  lineHeight: "24px",
-                  fontWeight: "600",
-                },
-              ],
-              "table-header": [
-                "12px",
-                {
-                  lineHeight: "16px",
-                  letterSpacing: "0.05em",
-                  fontWeight: "600",
-                },
-              ],
-              "ui-medium": [
-                "14px",
-                {
-                  lineHeight: "20px",
-                  fontWeight: "500",
-                },
-              ],
-              "body-sm": [
-                "12px",
-                {
-                  lineHeight: "18px",
-                  fontWeight: "400",
-                },
-              ],
-              subheading: [
-                "14px",
-                {
-                  lineHeight: "20px",
-                  fontWeight: "400",
-                },
-              ],
-            },
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PlacePrep - Crack Your Dream Company Interview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-highest": "#e1e3e4",
+                      "on-secondary-container": "#fefcff",
+                      "tertiary-fixed": "#ffddb8",
+                      "tertiary": "#000000",
+                      "on-primary-fixed": "#141b2b",
+                      "on-primary-container": "#7d8497",
+                      "on-secondary": "#ffffff",
+                      "tertiary-container": "#2a1700",
+                      "secondary": "#0058be",
+                      "surface-container-low": "#f3f4f5",
+                      "tertiary-fixed-dim": "#ffb95f",
+                      "surface-container-lowest": "#ffffff",
+                      "on-secondary-fixed-variant": "#004395",
+                      "primary-fixed": "#dce2f7",
+                      "surface": "#f8f9fa",
+                      "on-tertiary-container": "#b87500",
+                      "outline-variant": "#c6c6cd",
+                      "primary-container": "#141b2b",
+                      "inverse-on-surface": "#f0f1f2",
+                      "primary": "#000000",
+                      "secondary-container": "#2170e4",
+                      "on-error": "#ffffff",
+                      "primary-fixed-dim": "#c0c6db",
+                      "on-surface-variant": "#45464c",
+                      "inverse-surface": "#2e3132",
+                      "on-error-container": "#93000a",
+                      "outline": "#76777d",
+                      "on-surface": "#191c1d",
+                      "on-tertiary": "#ffffff",
+                      "on-tertiary-fixed-variant": "#653e00",
+                      "surface-container": "#edeeef",
+                      "on-tertiary-fixed": "#2a1700",
+                      "secondary-fixed": "#d8e2ff",
+                      "surface-tint": "#575e70",
+                      "on-primary": "#ffffff",
+                      "surface-dim": "#d9dadb",
+                      "inverse-primary": "#c0c6db",
+                      "on-secondary-fixed": "#001a42",
+                      "on-background": "#191c1d",
+                      "error-container": "#ffdad6",
+                      "error": "#ba1a1a",
+                      "surface-variant": "#e1e3e4",
+                      "secondary-fixed-dim": "#adc6ff",
+                      "surface-container-high": "#e7e8e9",
+                      "surface-bright": "#f8f9fa",
+                      "on-primary-fixed-variant": "#404758",
+                      "background": "#f8f9fa"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "container_padding": "24px",
+                      "sidebar_width": "216px",
+                      "gutter": "16px",
+                      "right_panel_width": "280px",
+                      "navbar_height": "56px"
+              },
+              "fontFamily": {
+                      "h1": [
+                              "Inter"
+                      ],
+                      "card-title": [
+                              "Inter"
+                      ],
+                      "table-header": [
+                              "Inter"
+                      ],
+                      "ui-medium": [
+                              "Inter"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "subheading": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "h1": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "card-title": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "table-header": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "ui-medium": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "subheading": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
           },
-        },
-      };
-    </script>
-  </head>
-  <body
-    class="bg-surface-container-lowest text-on-surface font-sans min-h-screen flex flex-col antialiased"
-  >
-    <!-- Top Navigation (Landing Page Specific - Minimal) -->
-    <header
-      class="w-full flex justify-between items-center px-6 py-4 bg-surface-container-lowest sticky top-0 z-50"
-    >
-      <div class="flex items-center gap-2">
-        <span class="font-h1 text-h1 text-primary">NST</span>
-        <span
-          class="text-on-surface-variant font-ui-medium text-ui-medium hidden sm:inline-block"
-          >| PlacePrep</span
-        >
-      </div>
-      <div>
-        <button
-          class="px-4 py-2 border border-outline-variant rounded-lg text-primary font-ui-medium text-ui-medium hover:bg-surface-container-low transition-colors"
-        >
-          Login
-        </button>
-      </div>
-    </header>
-    <!-- Main Content Canvas -->
-    <main class="flex-grow flex flex-col items-center w-full">
-      <!-- Hero Section -->
-      <section
-        class="w-full max-w-7xl px-6 py-16 md:py-24 flex flex-col lg:flex-row items-center justify-between gap-12"
-      >
-        <!-- Hero Text -->
-        <div class="w-full lg:w-1/2 flex flex-col items-start gap-6">
-          <div
-            class="inline-flex items-center gap-2 px-3 py-1 bg-secondary-fixed rounded-full"
-          >
-            <span
-              class="material-symbols-outlined text-on-secondary-fixed-variant text-sm"
-              >rocket_launch</span
-            >
-            <span
-              class="text-xs font-semibold text-on-secondary-fixed-variant uppercase tracking-wider"
-              >New Platform</span
-            >
-          </div>
-          <h1
-            class="text-4xl md:text-5xl lg:text-[48px] font-bold text-primary leading-tight tracking-tight"
-          >
-            Crack Your Dream Company Interview
-          </h1>
-          <p
-            class="text-lg md:text-[20px] text-on-surface-variant max-w-xl leading-relaxed"
-          >
-            India's first structured, data-driven interview prep portal built
-            exclusively for NST students to master technical and behavioral
-            rounds.
-          </p>
-          <div
-            class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mt-4"
-          >
-            <button
-              class="w-full sm:w-auto px-6 py-3 bg-primary text-on-primary rounded-lg font-ui-medium text-ui-medium hover:opacity-90 transition-opacity shadow-sm"
-            >
-              Get Started Free
+        }
+      </script>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-sans min-h-screen flex flex-col antialiased">
+<!-- Top Navigation (Landing Page Specific - Minimal) -->
+<header class="w-full flex justify-between items-center px-6 py-4 bg-surface-container-lowest sticky top-0 z-50">
+<div class="flex items-center gap-2">
+<span class="font-h1 text-h1 text-primary">NST</span>
+<span class="text-on-surface-variant font-ui-medium text-ui-medium hidden sm:inline-block">| PlacePrep</span>
+</div>
+<div>
+<button class="px-4 py-2 border border-outline-variant rounded-lg text-primary font-ui-medium text-ui-medium hover:bg-surface-container-low transition-colors">
+                Login
             </button>
-            <button
-              class="w-full sm:w-auto px-6 py-3 bg-surface-container-lowest border border-outline-variant text-primary rounded-lg font-ui-medium text-ui-medium hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2"
-            >
-              <span class="material-symbols-outlined text-[20px]"
-                >play_circle</span
-              >
-              View Demo
-            </button>
-          </div>
-        </div>
-        <!-- Hero Image/Mockup -->
-        <div class="w-full lg:w-1/2 relative">
-          <!-- Abstract Decorative Elements behind image -->
-          <div
-            class="absolute -top-10 -right-10 w-64 h-64 bg-primary-fixed rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"
-          ></div>
-          <div
-            class="absolute -bottom-10 -left-10 w-72 h-72 bg-secondary-fixed rounded-full mix-blend-multiply filter blur-3xl opacity-40"
-          ></div>
-          <div
-            class="relative w-full aspect-video md:aspect-[4/3] rounded-xl overflow-hidden border border-outline-variant shadow-lg bg-surface flex items-center justify-center p-2"
-          >
-            <img
-              alt="Dashboard Mockup"
-              class="w-full h-full object-cover rounded-lg shadow-sm"
-              data-alt="A sleek, modern software dashboard displayed on a high-resolution screen, showing complex data visualizations, charts, and clean typography. The interface is light-themed, predominantly crisp white with sharp black text and subtle blue accents for data points. The setting is a professional workspace, well-lit with natural light creating a highly productive, focused atmosphere. The overall mood conveys advanced technology, rigorous data analysis, and professional excellence."
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB_eaxvIXiRqIFcJ5XdGw9G297VSq4lnxdyNHa5Iyfo2XmT44GQQOew_Q4Laskd29yrJ6IG7kSRKYsaTvWZ8zQCoLqVwwubWnVAut0oiRY2SyjkM_shBQt_iRAmdAvjDDfxUxzifzzxjQ6A8I-eQaS18dZeRg8PIqpcTPjSxaJ4j-ZFPaphSYPyedIjxgQougJ9ZcAnD3WxYoPsCGlklbExACmO4DF6LRrCFvf121swKOrCu2GLSSvlFdfFZQM6zcInxMxQL2M2KGF"
-            />
-          </div>
-        </div>
-      </section>
-      <!-- Stats Divider -->
-      <section class="w-full border-y border-outline-variant bg-surface py-8">
-        <div
-          class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-center items-center divide-y md:divide-y-0 md:divide-x divide-outline-variant"
-        >
-          <div
-            class="w-full md:w-1/3 flex flex-col items-center justify-center py-4 md:py-0 text-center"
-          >
-            <h3 class="text-3xl font-bold text-primary mb-1">658+</h3>
-            <p class="font-subheading text-subheading text-on-surface-variant">
-              Companies Covered
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center w-full">
+<!-- Hero Section -->
+<section class="w-full max-w-7xl px-6 py-16 md:py-24 flex flex-col lg:flex-row items-center justify-between gap-12">
+<!-- Hero Text -->
+<div class="w-full lg:w-1/2 flex flex-col items-start gap-6">
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-secondary-fixed rounded-full">
+<span class="material-symbols-outlined text-on-secondary-fixed-variant text-sm">rocket_launch</span>
+<span class="text-xs font-semibold text-on-secondary-fixed-variant uppercase tracking-wider">New Platform</span>
+</div>
+<h1 class="text-4xl md:text-5xl lg:text-[48px] font-bold text-primary leading-tight tracking-tight">
+                    Crack Your Dream Company Interview
+                </h1>
+<p class="text-lg md:text-[20px] text-on-surface-variant max-w-xl leading-relaxed">
+                    India's first structured, data-driven interview prep portal built exclusively for NST students to master technical and behavioral rounds.
+                </p>
+<div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mt-4">
+<button class="w-full sm:w-auto px-6 py-3 bg-primary text-on-primary rounded-lg font-ui-medium text-ui-medium hover:opacity-90 transition-opacity shadow-sm">
+                        Get Started Free
+                    </button>
+<button class="w-full sm:w-auto px-6 py-3 bg-surface-container-lowest border border-outline-variant text-primary rounded-lg font-ui-medium text-ui-medium hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">play_circle</span>
+                        View Demo
+                    </button>
+</div>
+</div>
+<!-- Hero Image/Mockup -->
+<div class="w-full lg:w-1/2 relative">
+<!-- Abstract Decorative Elements behind image -->
+<div class="absolute -top-10 -right-10 w-64 h-64 bg-primary-fixed rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+<div class="absolute -bottom-10 -left-10 w-72 h-72 bg-secondary-fixed rounded-full mix-blend-multiply filter blur-3xl opacity-40"></div>
+<div class="relative w-full aspect-video md:aspect-[4/3] rounded-xl overflow-hidden border border-outline-variant shadow-lg bg-surface flex items-center justify-center p-2">
+<img alt="Dashboard Mockup" class="w-full h-full object-cover rounded-lg shadow-sm" data-alt="A sleek, modern software dashboard displayed on a high-resolution screen, showing complex data visualizations, charts, and clean typography. The interface is light-themed, predominantly crisp white with sharp black text and subtle blue accents for data points. The setting is a professional workspace, well-lit with natural light creating a highly productive, focused atmosphere. The overall mood conveys advanced technology, rigorous data analysis, and professional excellence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB_eaxvIXiRqIFcJ5XdGw9G297VSq4lnxdyNHa5Iyfo2XmT44GQQOew_Q4Laskd29yrJ6IG7kSRKYsaTvWZ8zQCoLqVwwubWnVAut0oiRY2SyjkM_shBQt_iRAmdAvjDDfxUxzifzzxjQ6A8I-eQaS18dZeRg8PIqpcTPjSxaJ4j-ZFPaphSYPyedIjxgQougJ9ZcAnD3WxYoPsCGlklbExACmO4DF6LRrCFvf121swKOrCu2GLSSvlFdfFZQM6zcInxMxQL2M2KGF"/>
+</div>
+</div>
+</section>
+<!-- Stats Divider -->
+<section class="w-full border-y border-outline-variant bg-surface py-8">
+<div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-center items-center divide-y md:divide-y-0 md:divide-x divide-outline-variant">
+<div class="w-full md:w-1/3 flex flex-col items-center justify-center py-4 md:py-0 text-center">
+<h3 class="text-3xl font-bold text-primary mb-1">658+</h3>
+<p class="font-subheading text-subheading text-on-surface-variant">Companies Covered</p>
+</div>
+<div class="w-full md:w-1/3 flex flex-col items-center justify-center py-4 md:py-0 text-center">
+<h3 class="text-3xl font-bold text-primary mb-1">18,000+</h3>
+<p class="font-subheading text-subheading text-on-surface-variant">Real Questions</p>
+</div>
+<div class="w-full md:w-1/3 flex flex-col items-center justify-center py-4 md:py-0 text-center">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">verified</span>
+<h3 class="text-xl font-bold text-primary">Built for NST</h3>
+</div>
+<p class="font-subheading text-subheading text-on-surface-variant">Tailored Curriculum</p>
+</div>
+</div>
+</section>
+<!-- Feature Preview Section -->
+<section class="w-full max-w-7xl px-6 py-20 flex flex-col items-center gap-12">
+<div class="text-center max-w-2xl">
+<h2 class="text-3xl font-bold text-primary mb-4">Everything you need to succeed</h2>
+<p class="font-subheading text-subheading text-on-surface-variant">
+                    Stop guessing what they'll ask. We've mapped out the exact requirements, questions, and roadmaps for top tech companies.
+                </p>
+</div>
+<!-- Bento-style Feature Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col items-start hover:border-outline transition-colors group">
+<div class="w-12 h-12 rounded-lg bg-primary-fixed flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-on-primary-fixed" style="font-variation-settings: 'FILL' 1;">business</span>
+</div>
+<h3 class="font-card-title text-card-title text-primary mb-2">Company Intel</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                        Deep dive into specific company hiring patterns, recent interview experiences, and core focus areas to target your prep.
+                    </p>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col items-start hover:border-outline transition-colors group">
+<div class="w-12 h-12 rounded-lg bg-secondary-fixed flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-on-secondary-fixed" style="font-variation-settings: 'FILL' 1;">map</span>
+</div>
+<h3 class="font-card-title text-card-title text-primary mb-2">100-Day Roadmap</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                        Structured, day-by-day study plans crafted from historical data to ensure you cover all necessary topics efficiently.
+                    </p>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col items-start hover:border-outline transition-colors group">
+<div class="w-12 h-12 rounded-lg bg-surface-container-high flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-on-surface" style="font-variation-settings: 'FILL' 1;">analytics</span>
+</div>
+<h3 class="font-card-title text-card-title text-primary mb-2">Curriculum Gap</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+                        Identify exactly what isn't taught in standard courses but is highly expected by elite engineering teams.
+                    </p>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full border-t border-outline-variant bg-surface-container-lowest py-8">
+<div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="font-h1 text-h1 text-primary">NST</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+                © 2024 PlacePrep by NST. All rights reserved.
             </p>
-          </div>
-          <div
-            class="w-full md:w-1/3 flex flex-col items-center justify-center py-4 md:py-0 text-center"
-          >
-            <h3 class="text-3xl font-bold text-primary mb-1">18,000+</h3>
-            <p class="font-subheading text-subheading text-on-surface-variant">
-              Real Questions
-            </p>
-          </div>
-          <div
-            class="w-full md:w-1/3 flex flex-col items-center justify-center py-4 md:py-0 text-center"
-          >
-            <div class="flex items-center gap-2 mb-1">
-              <span
-                class="material-symbols-outlined text-secondary"
-                style="font-variation-settings: &quot;FILL&quot; 1"
-                >verified</span
-              >
-              <h3 class="text-xl font-bold text-primary">Built for NST</h3>
-            </div>
-            <p class="font-subheading text-subheading text-on-surface-variant">
-              Tailored Curriculum
-            </p>
-          </div>
-        </div>
-      </section>
-      <!-- Feature Preview Section -->
-      <section
-        class="w-full max-w-7xl px-6 py-20 flex flex-col items-center gap-12"
-      >
-        <div class="text-center max-w-2xl">
-          <h2 class="text-3xl font-bold text-primary mb-4">
-            Everything you need to succeed
-          </h2>
-          <p class="font-subheading text-subheading text-on-surface-variant">
-            Stop guessing what they'll ask. We've mapped out the exact
-            requirements, questions, and roadmaps for top tech companies.
-          </p>
-        </div>
-        <!-- Bento-style Feature Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-          <!-- Card 1 -->
-          <div
-            class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col items-start hover:border-outline transition-colors group"
-          >
-            <div
-              class="w-12 h-12 rounded-lg bg-primary-fixed flex items-center justify-center mb-6 group-hover:scale-105 transition-transform"
-            >
-              <span
-                class="material-symbols-outlined text-on-primary-fixed"
-                style="font-variation-settings: &quot;FILL&quot; 1"
-                >business</span
-              >
-            </div>
-            <h3 class="font-card-title text-card-title text-primary mb-2">
-              Company Intel
-            </h3>
-            <p
-              class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed"
-            >
-              Deep dive into specific company hiring patterns, recent interview
-              experiences, and core focus areas to target your prep.
-            </p>
-          </div>
-          <!-- Card 2 -->
-          <div
-            class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col items-start hover:border-outline transition-colors group"
-          >
-            <div
-              class="w-12 h-12 rounded-lg bg-secondary-fixed flex items-center justify-center mb-6 group-hover:scale-105 transition-transform"
-            >
-              <span
-                class="material-symbols-outlined text-on-secondary-fixed"
-                style="font-variation-settings: &quot;FILL&quot; 1"
-                >map</span
-              >
-            </div>
-            <h3 class="font-card-title text-card-title text-primary mb-2">
-              100-Day Roadmap
-            </h3>
-            <p
-              class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed"
-            >
-              Structured, day-by-day study plans crafted from historical data to
-              ensure you cover all necessary topics efficiently.
-            </p>
-          </div>
-          <!-- Card 3 -->
-          <div
-            class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col items-start hover:border-outline transition-colors group"
-          >
-            <div
-              class="w-12 h-12 rounded-lg bg-surface-container-high flex items-center justify-center mb-6 group-hover:scale-105 transition-transform"
-            >
-              <span
-                class="material-symbols-outlined text-on-surface"
-                style="font-variation-settings: &quot;FILL&quot; 1"
-                >analytics</span
-              >
-            </div>
-            <h3 class="font-card-title text-card-title text-primary mb-2">
-              Curriculum Gap
-            </h3>
-            <p
-              class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed"
-            >
-              Identify exactly what isn't taught in standard courses but is
-              highly expected by elite engineering teams.
-            </p>
-          </div>
-        </div>
-      </section>
-    </main>
-    <!-- Footer -->
-    <footer
-      class="w-full border-t border-outline-variant bg-surface-container-lowest py-8"
-    >
-      <div
-        class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4"
-      >
-        <div class="flex items-center gap-2">
-          <span class="font-h1 text-h1 text-primary">NST</span>
-        </div>
-        <p class="font-body-sm text-body-sm text-on-surface-variant">
-          © 2024 PlacePrep by NST. All rights reserved.
-        </p>
-        <div class="flex gap-4">
-          <a
-            class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm"
-            href="#"
-            >Privacy Policy</a
-          >
-          <a
-            class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm"
-            href="#"
-            >Terms of Service</a
-          >
-        </div>
-      </div>
-    </footer>
-  </body>
-</html>
+<div class="flex gap-4">
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-sm text-body-sm" href="#">Terms of Service</a>
+</div>
+</div>
+</footer>
+</body></html>

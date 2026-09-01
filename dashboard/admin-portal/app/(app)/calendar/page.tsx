@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Users, BookOpen } from "lucide-react";
-import { mockSessions } from "@/lib/mock-data";
+import { useBookingsData } from "@/lib/hooks";
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
@@ -25,17 +25,7 @@ function buildCalendarGrid(year: number, month: number) {
   return cells;
 }
 
-// Synthetic session distribution across the month for demo
-const SESSION_DAYS: Record<number, { count: number; type: "upcoming" | "completed" | "mixed" }> = {
-  3: { count: 2, type: "upcoming" },
-  7: { count: 1, type: "completed" },
-  10: { count: 3, type: "mixed" },
-  14: { count: 1, type: "upcoming" },
-  17: { count: 2, type: "completed" },
-  21: { count: 4, type: "mixed" },
-  24: { count: 1, type: "upcoming" },
-  28: { count: 2, type: "completed" },
-};
+// Dynamic generation of session days happens inside the component based on dailyTrend.
 
 const STATUS_BADGE: Record<string, string> = {
   upcoming:  "bg-indigo-50 text-indigo-700 border border-indigo-200",
@@ -70,9 +60,92 @@ export default function CalendarPage() {
     setSelectedDay(null);
   };
 
-  const upcoming  = mockSessions.filter(s => s.status.toLowerCase() === "upcoming").length;
-  const completed = mockSessions.filter(s => s.status.toLowerCase() === "completed").length;
-  const selectedSessions = selectedDay ? SESSION_DAYS[selectedDay] : null;
+  const { data: bookingsData, isLoading } = useBookingsData();
+
+  // ── Skeleton ────────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="space-y-5 animate-pulse">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="h-7 w-48 bg-gray-200 rounded" />
+            <div className="h-4 w-72 bg-gray-100 rounded" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-8 w-28 bg-indigo-100 rounded-full" />
+            <div className="h-8 w-28 bg-blue-100 rounded-full" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Calendar skeleton */}
+          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="w-8 h-8 bg-gray-200 rounded-lg" />
+              <div className="h-5 w-36 bg-gray-200 rounded" />
+              <div className="w-8 h-8 bg-gray-200 rounded-lg" />
+            </div>
+            <div className="grid grid-cols-7 border-b border-gray-100">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <div key={i} className="py-2 flex justify-center">
+                  <div className="h-3 w-6 bg-gray-100 rounded" />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {Array.from({ length: 35 }).map((_, i) => (
+                <div key={i} className="min-h-[64px] p-2 border-b border-r border-gray-50">
+                  <div className="h-4 w-5 bg-gray-100 rounded ml-auto mb-1" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Side panel skeleton */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-200 rounded-xl" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="h-4 w-32 bg-gray-200 rounded" />
+                  <div className="h-3 w-20 bg-gray-100 rounded" />
+                </div>
+              </div>
+              <div className="h-16 bg-gray-100 rounded-lg" />
+            </div>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-gray-100 rounded-lg" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 w-20 bg-gray-100 rounded" />
+                    <div className="h-4 w-10 bg-gray-200 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const sessionDays: Record<number, { count: number; type: "upcoming" | "completed" | "mixed" }> = {};
+  bookingsData?.dailyTrend?.forEach((d: any) => {
+    const date = new Date(d.date);
+    if (date.getFullYear() === viewYear && date.getMonth() === viewMonth && d.count > 0) {
+      sessionDays[date.getDate()] = {
+        count: d.count,
+        type: d.count > 2 ? "mixed" : d.count > 1 ? "completed" : "upcoming"
+      };
+    }
+  });
+
+  // Derive totals from byBatch aggregated data (sessions list is not returned by bookings API)
+  const byBatch: { batch: string; upcoming: number; completed: number; cancelled: number }[] =
+    bookingsData?.byBatch ?? [];
+  const upcoming  = byBatch.reduce((sum, b) => sum + (b.upcoming ?? 0), 0);
+  const completed = byBatch.reduce((sum, b) => sum + (b.completed ?? 0), 0);
+  const selectedSessions = selectedDay ? sessionDays[selectedDay] : null;
+
 
   return (
     <div className="space-y-5">
@@ -129,8 +202,8 @@ export default function CalendarPage() {
             {cells.map((cell, idx) => {
               const isToday = isCurrentMonth && cell.curr && cell.day === today.getDate();
               const isSelected = cell.curr && cell.day === selectedDay;
-              const hasSession = cell.curr && SESSION_DAYS[cell.day];
-              const sessionInfo = hasSession ? SESSION_DAYS[cell.day] : null;
+              const hasSession = cell.curr && sessionDays[cell.day];
+              const sessionInfo = hasSession ? sessionDays[cell.day] : null;
 
               return (
                 <button
@@ -217,23 +290,37 @@ export default function CalendarPage() {
                 </div>
 
                 {selectedSessions ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: selectedSessions.count }, (_, i) => (
-                      <div key={i} className="flex items-center gap-5 p-2.5 rounded-lg bg-gray-50 border border-gray-100">
-                        <div className={`w-1.5 h-8 rounded-full ${DOT_COLOR[selectedSessions.type]}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-800 truncate">
-                            {mockSessions[i % mockSessions.length]?.topic ?? "DSA Mock Interview"}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {mockSessions[i % mockSessions.length]?.mentorName ?? "Prof. Sharma"} · {["10:00 AM", "2:00 PM", "4:30 PM", "6:00 PM"][i % 4]}
-                          </p>
-                        </div>
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${STATUS_BADGE[selectedSessions.type]}`}>
-                          {selectedSessions.type}
-                        </span>
+                  <div className="space-y-3">
+                    {/* Count summary */}
+                    <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+                      selectedSessions.type === "completed" ? "bg-blue-50 border-blue-100" :
+                      selectedSessions.type === "upcoming"  ? "bg-indigo-50 border-indigo-100" :
+                      "bg-cyan-50 border-cyan-100"
+                    }`}>
+                      <div className={`w-1.5 rounded-full self-stretch ${DOT_COLOR[selectedSessions.type]}`} />
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-gray-900">
+                          {selectedSessions.count} Session{selectedSessions.count > 1 ? "s" : ""}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Status: <span className="font-semibold capitalize">{selectedSessions.type}</span>
+                        </p>
                       </div>
-                    ))}
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${STATUS_BADGE[selectedSessions.type]}`}>
+                        {selectedSessions.type}
+                      </span>
+                    </div>
+                    {/* Guidance to Bookings section */}
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+                      <BookOpen className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        Individual session details are available in the{" "}
+                        <a href="/bookings" className="text-blue-600 font-semibold hover:underline">
+                          Bookings section
+                        </a>
+                        , including mentor name, topic, and time slot.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-6">
@@ -254,9 +341,9 @@ export default function CalendarPage() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">This Month</h3>
             {[
-              { icon: Clock,   label: "Total Sessions", value: "24", color: "text-blue-600 bg-blue-50" },
-              { icon: Users,   label: "Unique Students", value: "18", color: "text-indigo-600 bg-indigo-50" },
-              { icon: BookOpen,label: "Avg per Day",     value: "3.4", color: "text-cyan-600 bg-cyan-50" },
+              { icon: Clock,   label: "Total Sessions", value: `${bookingsData?.summary?.thisMonth || 0}`, color: "text-blue-600 bg-blue-50" },
+              { icon: Users,   label: "Active Batches", value: `${bookingsData?.byBatch?.length || 0}`, color: "text-indigo-600 bg-indigo-50" },
+              { icon: BookOpen,label: "Avg per Day",     value: `${bookingsData?.summary?.thisMonth ? (bookingsData.summary.thisMonth / 30).toFixed(1) : "0"}`, color: "text-cyan-600 bg-cyan-50" },
             ].map(stat => (
               <div key={stat.label} className="flex items-center gap-5">
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${stat.color}`}>

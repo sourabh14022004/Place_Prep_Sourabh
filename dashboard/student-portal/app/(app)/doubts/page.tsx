@@ -1,12 +1,29 @@
 "use client";
-import { useState } from "react";
+import { FeatureGate } from "@/lib/features";
+import { useState, useEffect } from "react";
 import {
   MessageCircle, Plus, ChevronDown, ChevronUp,
-  Clock, CheckCircle2, AlertCircle, Send, Tag, X,
+  Clock, CheckCircle2, AlertCircle, Send, Tag, X, Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useProfile } from "@/lib/hooks";
+import ErrorState from "@/components/ErrorState";
+import { usePageTitle } from "@/lib/use-page-title";
 
 type DoubtStatus = "pending" | "answered" | "resolved";
-type DoubtTag = "DSA" | "System Design" | "LLD" | "HR" | "General";
+/**
+ * Must stay in sync with DOUBT_DOMAINS in backend/src/types/shared.types.ts.
+ * A tag missing here is a tag no student can ever pick, which strands every
+ * faculty the admin assigned to that domain.
+ */
+type DoubtTag =
+  | "DSA"
+  | "System Design"
+  | "LLD"
+  | "Web Development"
+  | "Aptitude"
+  | "HR"
+  | "General";
 
 interface DoubtReply {
   id: string;
@@ -26,54 +43,18 @@ interface Doubt {
   replies: DoubtReply[];
 }
 
-const TAGS: DoubtTag[] = ["DSA", "System Design", "LLD", "HR", "General"];
-
-const mockDoubts: Doubt[] = [
-  {
-    id: "d1",
-    subject: "How to approach 2-pointer problems in interviews?",
-    body: "I keep freezing when I see sliding window / two-pointer problems. Should I memorise templates or try to derive them from scratch each time?",
-    tag: "DSA",
-    status: "answered",
-    createdAt: "2026-06-24T10:00:00Z",
-    replies: [
-      {
-        id: "r1", author: "faculty", authorName: "Prof. Sharma",
-        body: "Great question! You should understand the intuition behind both patterns so you can derive them. The template approach works initially but breaks down on novel variants. I'd recommend practising 5 two-pointer problems without templates first, then check solutions.",
-        sentAt: "2026-06-24T12:30:00Z",
-      },
-      {
-        id: "r2", author: "student", authorName: "You",
-        body: "That makes sense! Should I start with LeetCode Easy problems or jump to Medium directly?",
-        sentAt: "2026-06-24T13:00:00Z",
-      },
-    ],
-  },
-  {
-    id: "d2",
-    subject: "Difference between HLD and LLD — when to go deep?",
-    body: "In a Google interview, if they say 'design a URL shortener', should I go into class diagrams or stay at system level? I get confused about how much depth to cover.",
-    tag: "System Design",
-    status: "pending",
-    createdAt: "2026-06-24T14:00:00Z",
-    replies: [],
-  },
-  {
-    id: "d3",
-    subject: "STAR method — how long should each answer be?",
-    body: "My behavioral answers feel either too short or way too long. Is there a time limit I should target for each STAR response?",
-    tag: "HR",
-    status: "resolved",
-    createdAt: "2026-06-23T09:00:00Z",
-    replies: [
-      {
-        id: "r3", author: "faculty", authorName: "Prof. Sharma",
-        body: "Target 2–3 minutes per STAR answer. Situation + Task = ~30 seconds, Action = ~90 seconds (the meat), Result = ~30 seconds. Practice recording yourself — you'll immediately see if you're running long.",
-        sentAt: "2026-06-23T11:00:00Z",
-      },
-    ],
-  },
+const TAGS: DoubtTag[] = [
+  "DSA",
+  "System Design",
+  "LLD",
+  "Web Development",
+  "Aptitude",
+  "HR",
+  "General",
 ];
+
+
+
 
 // ── Status config — blue/white only ──────────────────
 const STATUS_MAP: Record<DoubtStatus, { label: string; dot: string; badge: string }> = {
@@ -84,11 +65,13 @@ const STATUS_MAP: Record<DoubtStatus, { label: string; dot: string; badge: strin
 
 // ── Tag config — blue-scale only ──────────────────────
 const TAG_MAP: Record<DoubtTag, string> = {
-  "DSA":           "bg-blue-100 text-blue-800",
-  "System Design": "bg-blue-50 text-blue-700",
-  "LLD":           "bg-slate-100 text-slate-700",
-  "HR":            "bg-gray-100 text-gray-700",
-  "General":       "bg-gray-50 text-gray-600",
+  "DSA":             "bg-blue-100 text-blue-800",
+  "System Design":   "bg-blue-50 text-blue-700",
+  "LLD":             "bg-slate-100 text-slate-700",
+  "Web Development": "bg-sky-50 text-sky-700",
+  "Aptitude":        "bg-indigo-50 text-indigo-700",
+  "HR":              "bg-gray-100 text-gray-700",
+  "General":         "bg-gray-50 text-gray-600",
 };
 
 function timeAgo(iso: string) {
@@ -115,9 +98,29 @@ function TagPill({ tag }: { tag: DoubtTag }) {
   );
 }
 
-function DoubtCard({ doubt, onResolve }: { doubt: Doubt; onResolve: (id: string) => void }) {
+function DoubtCard({ doubt, onResolve, onReply }: { 
+  doubt: Doubt; 
+  onResolve: (id: string) => void;
+  onReply: (id: string, body: string) => Promise<void>;
+}) {
   const [open, setOpen] = useState(doubt.status === "answered");
   const [replyText, setReplyText] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendReply = async () => {
+    const text = replyText.trim();
+    if (!text || isSending) return;
+    setIsSending(true);
+    try {
+      await onReply(doubt.id, text);
+      setReplyText("");
+      toast.success("Reply sent!");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to send reply.");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const leftAccent =
     doubt.status === "answered" ? "border-l-blue-600" :
@@ -128,7 +131,7 @@ function DoubtCard({ doubt, onResolve }: { doubt: Doubt; onResolve: (id: string)
       {/* Header row */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50"
+        className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50:bg-slate-800/60"
       >
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -196,11 +199,23 @@ function DoubtCard({ doubt, onResolve }: { doubt: Doubt; onResolve: (id: string)
                   type="text"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && replyText.trim().length > 0) {
+                      e.preventDefault();
+                      handleSendReply();
+                    }
+                  }}
                   placeholder="Write a follow-up..."
                   className="flex-1 text-sm border border-gray-200 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  disabled={isSending}
                 />
-                <button className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm">
-                  <Send className="w-3.5 h-3.5" />
+                <button
+                  onClick={handleSendReply}
+                  disabled={isSending || replyText.trim().length === 0}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Send reply"
+                >
+                  {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 </button>
               </div>
               <button
@@ -225,7 +240,7 @@ function NewDoubtDrawer({ onClose, onSubmit }: {
   const [body, setBody] = useState("");
   const [tag, setTag] = useState<DoubtTag>("DSA");
 
-  const canSubmit = subject.trim().length > 5 && body.trim().length > 10;
+  const canSubmit = subject.trim().length >= 5 && body.trim().length >= 20;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -273,6 +288,9 @@ function NewDoubtDrawer({ onClose, onSubmit }: {
               className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-[10px] text-gray-400 mt-1 text-right">{subject.length}/100</p>
+            {subject.trim().length > 0 && subject.trim().length < 5 && (
+              <p className="text-[11px] text-red-500 mt-1">Subject must be at least 5 characters</p>
+            )}
           </div>
 
           {/* Body */}
@@ -285,6 +303,12 @@ function NewDoubtDrawer({ onClose, onSubmit }: {
               placeholder="Explain your doubt in detail..."
               className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
+            <p className="text-[10px] mt-1 text-right">
+              {body.trim().length < 20
+                ? <span className="text-orange-500">{body.trim().length}/20 chars minimum</span>
+                : <span className="text-green-500">{body.trim().length} chars ✓</span>
+              }
+            </p>
           </div>
         </div>
 
@@ -305,20 +329,113 @@ function NewDoubtDrawer({ onClose, onSubmit }: {
   );
 }
 
-export default function DoubtsPage() {
-  const [doubts, setDoubts] = useState<Doubt[]>(mockDoubts);
+function DoubtsPageInner() {
+  usePageTitle("Ask a Doubt");
+  const [doubts, setDoubts] = useState<Doubt[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  // Failures here used to be swallowed into an empty list, so a network error
+  // was indistinguishable from "you have no doubts yet".
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<"all" | DoubtStatus>("all");
+  // BUG-C FIX: Get real student name for reply authorName
+  const { data: profile } = useProfile();
+
+  useEffect(() => {
+    setIsLoading(true);
+    setLoadError(null);
+    import("@/lib/api").then(({ getDoubts }) =>
+      getDoubts().then((data: any[]) => {
+        const mapped: Doubt[] = data.map((d) => ({
+          id: d._id,
+          subject: d.subject,
+          body: d.body,
+          tag: (d.tag ?? "General") as DoubtTag,
+          status: (d.status === "closed" ? "resolved" : d.status) as DoubtStatus,
+          createdAt: d.createdAt,
+          replies: (d.replies ?? []).map((r: any) => ({
+            id: r._id ?? String(Math.random()),
+            author: r.authorRole === "faculty" ? "faculty" : "student",
+            authorName: r.authorName,
+            body: r.body,
+            sentAt: r.sentAt,
+          })),
+        }));
+        if (mapped.length > 0) setDoubts(mapped);
+        setIsLoading(false);
+      }).catch((err: unknown) => {
+        setLoadError(err instanceof Error ? err : new Error('Failed to load doubts.'));
+        setIsLoading(false);
+      })
+    ).catch((err: unknown) => {
+      setLoadError(err instanceof Error ? err : new Error('Failed to load doubts.'));
+      setIsLoading(false);
+    });
+  }, [reloadKey]);
 
   const handleSubmit = (d: Omit<Doubt, "id" | "replies" | "createdAt" | "status">) => {
-    setDoubts((prev) => [{
-      ...d, id: `d${Date.now()}`, status: "pending",
-      createdAt: new Date().toISOString(), replies: [],
-    }, ...prev]);
+    import("@/lib/hooks").then(({ createDoubt }) =>
+      createDoubt({ subject: d.subject, body: d.body, tag: d.tag })
+        .then((created: any) => {
+          setDoubts((prev) => [{
+            id: created._id,
+            subject: created.subject,
+            body: created.body,
+            tag: created.tag as DoubtTag,
+            status: "pending",
+            createdAt: created.createdAt,
+            replies: [],
+          }, ...prev]);
+          toast.success("Doubt submitted successfully!");
+        })
+        .catch((err) => {
+          toast.error(err?.message || "Failed to submit doubt.");
+        })
+    ).catch(() => {
+      toast.error("Failed to submit doubt.");
+    });
   };
 
-  const handleResolve = (id: string) =>
-    setDoubts((prev) => prev.map((d) => d.id === id ? { ...d, status: "resolved" } : d));
+  const handleResolve = (id: string) => {
+    import("@/lib/hooks").then(({ resolveDoubt }) => {
+      // Optimistic update
+      setDoubts((prev) => prev.map((d) => d.id === id ? { ...d, status: "resolved" } : d));
+      resolveDoubt(id)
+        .then(() => toast.success("Doubt marked as resolved!"))
+        .catch((err) => {
+          toast.error(err?.message || "Failed to resolve doubt.");
+          // Revert on error
+          setDoubts((prev) => prev.map((d) => d.id === id ? { ...d, status: "answered" } : d));
+        });
+    });
+  };
+
+  const handleReply = async (id: string, body: string): Promise<void> => {
+    const res = await fetch(`/api/doubts/${id}/replies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ body }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || "Failed to send reply.");
+    }
+    // Optimistically append reply to local state
+    const json = await res.json();
+    const newReply: DoubtReply = {
+      id: String(Date.now()),
+      author: "student",
+      // BUG-C FIX: Use real student name from profile instead of hardcoded "You"
+      authorName: (profile?.fullName as string) ?? "You",
+      body,
+      sentAt: new Date().toISOString(),
+    };
+    setDoubts((prev) => prev.map((d) =>
+      d.id === id ? { ...d, replies: [...d.replies, newReply] } : d
+    ));
+  };
 
   const filtered = filter === "all" ? doubts : doubts.filter((d) => d.status === filter);
   const counts = {
@@ -327,6 +444,39 @@ export default function DoubtsPage() {
     answered: doubts.filter((d) => d.status === "answered").length,
     resolved: doubts.filter((d) => d.status === "resolved").length,
   };
+
+  if (loadError) {
+    return (
+      <ErrorState
+        error={loadError}
+        title="Couldn't load your doubts"
+        onRetry={() => setReloadKey((k) => k + 1)}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex gap-6">
+        <div className="flex-1 min-w-0 animate-pulse">
+          <div className="h-7 bg-gray-100 rounded w-32 mb-5" />
+          <div className="flex gap-2 mb-5">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-8 w-20 bg-gray-100 rounded" />)}
+          </div>
+          <div className="space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 bg-gray-100 rounded border border-gray-200" />
+            ))}
+          </div>
+        </div>
+        <aside className="hidden lg:block w-64 shrink-0 space-y-4 animate-pulse">
+          <div className="h-36 bg-gray-100 rounded-xl" />
+          <div className="h-48 bg-gray-100 rounded-xl" />
+          <div className="h-28 bg-gray-100 rounded-xl" />
+        </aside>
+      </div>
+    );
+  }
 
   return (
     <div className="flex gap-6">
@@ -349,7 +499,7 @@ export default function DoubtsPage() {
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold capitalize border-r border-gray-200 last:border-r-0 ${
                 filter === f
                   ? "bg-blue-600 text-white"
-                  : "text-gray-500 hover:bg-gray-50"
+                  : "text-gray-500 hover:bg-gray-50:bg-slate-800/60"
               }`}
             >
               {f}
@@ -384,7 +534,7 @@ export default function DoubtsPage() {
               <p className="text-sm font-medium text-gray-400">No doubts in this category</p>
             </div>
           ) : (
-            filtered.map((d) => <DoubtCard key={d.id} doubt={d} onResolve={handleResolve} />)
+            filtered.map((d) => <DoubtCard key={d.id} doubt={d} onResolve={handleResolve} onReply={handleReply} />)
           )}
         </div>
       </div>
@@ -463,3 +613,12 @@ export default function DoubtsPage() {
 }
 
 
+
+// Admin feature-toggle gate (Feature Controls → student.doubts)
+export default function DoubtsPageGate() {
+  return (
+    <FeatureGate feature="student.doubts" title="Ask a Doubt">
+      <DoubtsPageInner  />
+    </FeatureGate>
+  );
+}

@@ -1,4 +1,5 @@
 "use client";
+import { FeatureGate } from "@/lib/use-features";
 
 import { useState, useEffect } from "react";
 import {
@@ -33,149 +34,6 @@ interface FacultyLeaderboardEntry {
   isCurrentUser: boolean;
 }
 
-// ── Mock data ────────────────────────────────────────────────────────────────
-const mockLeaderboard: FacultyLeaderboardEntry[] = [
-  {
-    id: "f3",
-    rank: 1,
-    prevRank: 2,
-    name: "Dr. Priya Nair",
-    initials: "PN",
-    department: "Computer Science",
-    title: "Associate Professor",
-    doubtsSolved: 84,
-    studentRating: 4.9,
-    menteeCount: 18,
-    totalScore: 965,
-    isCurrentUser: false,
-  },
-  {
-    id: "f7",
-    rank: 2,
-    prevRank: 1,
-    name: "Prof. Sharma",
-    initials: "PS",
-    department: "Computer Science",
-    title: "Professor",
-    doubtsSolved: 72,
-    studentRating: 4.8,
-    menteeCount: 14,
-    totalScore: 918,
-    isCurrentUser: true,
-  },
-  {
-    id: "f2",
-    rank: 3,
-    prevRank: 4,
-    name: "Dr. Ankit Mehta",
-    initials: "AM",
-    department: "AI & ML",
-    title: "Assistant Professor",
-    doubtsSolved: 65,
-    studentRating: 4.7,
-    menteeCount: 12,
-    totalScore: 876,
-    isCurrentUser: false,
-  },
-  {
-    id: "f5",
-    rank: 4,
-    prevRank: 3,
-    name: "Prof. Rajesh Kumar",
-    initials: "RK",
-    department: "Data Science",
-    title: "Professor",
-    doubtsSolved: 58,
-    studentRating: 4.6,
-    menteeCount: 16,
-    totalScore: 847,
-    isCurrentUser: false,
-  },
-  {
-    id: "f9",
-    rank: 5,
-    prevRank: 6,
-    name: "Dr. Sneha Patil",
-    initials: "SP",
-    department: "Web Technologies",
-    title: "Associate Professor",
-    doubtsSolved: 51,
-    studentRating: 4.5,
-    menteeCount: 10,
-    totalScore: 810,
-    isCurrentUser: false,
-  },
-  {
-    id: "f4",
-    rank: 6,
-    prevRank: 5,
-    name: "Dr. Vivek Rao",
-    initials: "VR",
-    department: "Systems & Networks",
-    title: "Assistant Professor",
-    doubtsSolved: 44,
-    studentRating: 4.3,
-    menteeCount: 9,
-    totalScore: 769,
-    isCurrentUser: false,
-  },
-  {
-    id: "f6",
-    rank: 7,
-    prevRank: 8,
-    name: "Prof. Meera Iyer",
-    initials: "MI",
-    department: "Cloud & DevOps",
-    title: "Professor",
-    doubtsSolved: 38,
-    studentRating: 4.2,
-    menteeCount: 8,
-    totalScore: 731,
-    isCurrentUser: false,
-  },
-  {
-    id: "f10",
-    rank: 8,
-    prevRank: 7,
-    name: "Dr. Karan Bhatia",
-    initials: "KB",
-    department: "Database Systems",
-    title: "Assistant Professor",
-    doubtsSolved: 32,
-    studentRating: 4.1,
-    menteeCount: 7,
-    totalScore: 694,
-    isCurrentUser: false,
-  },
-  {
-    id: "f8",
-    rank: 9,
-    prevRank: 9,
-    name: "Dr. Pooja Sinha",
-    initials: "PS2",
-    department: "Algorithms",
-    title: "Lecturer",
-    doubtsSolved: 25,
-    studentRating: 3.9,
-    menteeCount: 5,
-    totalScore: 637,
-    isCurrentUser: false,
-  },
-  {
-    id: "f11",
-    rank: 10,
-    prevRank: 10,
-    name: "Prof. Suresh Nanda",
-    initials: "SN",
-    department: "Compilers & OS",
-    title: "Associate Professor",
-    doubtsSolved: 19,
-    studentRating: 3.7,
-    menteeCount: 4,
-    totalScore: 591,
-    isCurrentUser: false,
-  },
-];
 
 // Consistent avatar gradient seeded by initials
 const AVATAR_GRADIENTS = [
@@ -191,39 +49,57 @@ function avatarGradient(initials: string) {
   return AVATAR_GRADIENTS[initials.charCodeAt(0) % AVATAR_GRADIENTS.length];
 }
 
-export default function FacultyLeaderboardPage() {
+function FacultyLeaderboardPageInner() {
   const [filterPeriod, setFilterPeriod] = useState<"All Time" | "Monthly">("All Time");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState<FacultyLeaderboardEntry[]>([]);
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 450);
-    return () => clearTimeout(t);
+    fetch("/api/faculty/leaderboard", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        const raw: any[] = data?.data?.leaderboard ?? data?.leaderboard ?? data?.data ?? [];
+        const mapped: FacultyLeaderboardEntry[] = raw.map((f: any, idx: number) => ({
+          id: f._id ?? f.id ?? String(idx),
+          rank: f.rank ?? idx + 1,
+          prevRank: f.prevRank ?? f.rank ?? idx + 1,
+          name: f.fullName ?? f.name ?? "Faculty",
+          initials: (f.fullName ?? f.name ?? "F")
+            .split(" ")
+            .map((w: string) => w[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
+          department: f.department ?? f.subject ?? "Computer Science",
+          title: f.title ?? "Faculty",
+          doubtsSolved: f.doubtsSolved ?? f.totalDoubts ?? 0,
+          studentRating: f.studentRating ?? f.rating ?? 4.5,
+          menteeCount: f.menteeCount ?? f.studentCount ?? 0,
+          totalScore: f.totalScore ?? f.xpTotal ?? 0,
+          isCurrentUser: f.isCurrentUser ?? false,
+        }));
+        setLeaderboard(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const currentUser = mockLeaderboard.find((f) => f.isCurrentUser) || mockLeaderboard[1];
+  const currentUser = leaderboard.find((f) => f.isCurrentUser) ?? leaderboard[0] ?? null;
 
   const filteredLeaderboard = searchQuery.trim()
-    ? mockLeaderboard.filter(
+    ? leaderboard.filter(
         (f) =>
           f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           f.department.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : mockLeaderboard;
+    : leaderboard;
 
   const top3 = filteredLeaderboard.slice(0, 3);
   const rest = filteredLeaderboard.slice(3);
 
   return (
     <div className="max-w-7xl mx-auto pb-20">
-      {/* Page Header */}
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Faculty Leaderboard</h1>
-          <p className="text-sm text-gray-500">Faculty rankings based on doubt resolutions, mentorship sessions, and student feedback scores.</p>
-        </div>
-      </div>
-
       {isLoading ? (
         <div className="space-y-6">
           <div className="h-44 bg-gray-100 animate-pulse rounded-2xl" />
@@ -343,7 +219,7 @@ export default function FacultyLeaderboardPage() {
                 <Trophy className="w-5 h-5 text-white" />
               </div>
               <div>
-                <p className="font-bold text-base leading-snug">Your Rank: #{currentUser.rank}</p>
+                <p className="font-bold text-base leading-snug">Your Rank: #{currentUser?.rank ?? "—"}</p>
                 <p className="text-xs text-blue-100 leading-normal mt-0.5">
                   Resolve unresolved student doubts and maintain positive student feedback ratings to claim the top spot.
                 </p>
@@ -455,5 +331,15 @@ export default function FacultyLeaderboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+
+// Admin feature-toggle gate (Feature Controls → faculty.leaderboard)
+export default function FacultyLeaderboardPageGate() {
+  return (
+    <FeatureGate feature="faculty.leaderboard" title="Leaderboard">
+      <FacultyLeaderboardPageInner />
+    </FeatureGate>
   );
 }

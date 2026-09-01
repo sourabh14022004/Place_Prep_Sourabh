@@ -1,4 +1,5 @@
 "use client";
+import { FeatureGate } from "@/lib/use-features";
 
 import { useState, useEffect } from "react";
 import {
@@ -15,10 +16,33 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
-import { mockFacultySessionRequests } from "@/lib/mock-data";
-import { FacultySessionRequest, SessionStatus } from "@/lib/mock-data";
 
-const TIME_SLOTS = ["9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"];
+import { FacultySessionRequest, SessionStatus } from "@/lib/types";
+import { getSessions, confirmSession, declineSession, proposeAlternative } from "@/lib/api";
+import { toast } from "sonner";
+import { 
+  format, 
+  addMonths, 
+  subMonths, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  eachDayOfInterval, 
+  isSameMonth, 
+  isSameDay, 
+  isToday 
+} from "date-fns";
+
+// HH:mm values — matches Zod regex /^\d{2}:\d{2}$/ required by proposeSessionSchema
+const TIME_SLOTS = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"];
+function fmtTimeSlot(t: string) {
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr, 10);
+  const suffix = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${h12}:${mStr} ${suffix}`;
+}
 
 const STATUS_CFG: Record<SessionStatus, { label: string; cls: string; border: string; icon: React.ElementType; color: string }> = {
   pending: { 
@@ -67,8 +91,8 @@ function fmtDate(d: string) {
   });
 }
 
-export default function RequestsPage() {
-  const [requests, setRequests] = useState<FacultySessionRequest[]>(mockFacultySessionRequests);
+function RequestsPageInner() {
+  const [requests, setRequests] = useState<FacultySessionRequest[]>([]);
   const [activeTab, setActiveTab] = useState<"All" | SessionStatus>("All");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [proposingFor, setProposingFor] = useState<string | null>(null);
@@ -76,53 +100,82 @@ export default function RequestsPage() {
   const [proposedTime, setProposedTime] = useState(TIME_SLOTS[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-
-  // Feedback modal state
-  const [feedbackModalReq, setFeedbackModalReq] = useState<FacultySessionRequest | null>(null);
-  const [ratingVal, setRatingVal] = useState(5);
-  const [strengthsInput, setStrengthsInput] = useState("");
-  const [improvementsInput, setImprovementsInput] = useState("");
-  const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 450);
-    return () => clearTimeout(t);
+    getSessions()
+      .then(({ sessions }) => {
+        const mapped: FacultySessionRequest[] = sessions.map((s: any) => {
+          // BUG 2 FIX: SessionBooking model stores requestedDate (YYYY-MM-DD string)
+          // and requestedTime (HH:mm string) — NOT scheduledAt or durationMins.
+          // studentName is denormalized on the document — no need to populate.
+          const studentName = s.studentName ?? (typeof s.studentId === "object" ? s.studentId?.fullName ?? "Student" : "Student");
+          return {
+            id: s._id,
+            studentName,
+            studentInitials: studentName.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+            batch: typeof s.studentId === "object" ? s.studentId?.batch ?? "2024" : "2024",
+            year: typeof s.studentId === "object" ? s.studentId?.year ?? "3rd" : "3rd",
+            branch: typeof s.studentId === "object" ? s.studentId?.branch ?? "CS" : "CS",
+            topic: s.topic,
+            notes: s.notes ?? "",
+            date: s.requestedDate ?? "",         // YYYY-MM-DD ✓
+            time: s.requestedTime ?? "",          // HH:mm ✓
+            duration: s.durationMin ?? 30,        // 30 | 60 ✓
+            status: (s.status === "declined" ? "cancelled" : s.status) as SessionStatus,
+            meetLink: s.meetLink,
+            proposedDate: s.proposedDate,         // stored as plain string in model
+            proposedTime: s.proposedTime,         // stored as plain string in model
+          };
+        });
+        if (mapped.length > 0) setRequests(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
   const handleConfirm = (id: string) => {
     setRequests((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: "confirmed",
-              meetLink: `https://meet.jit.si/NST-PlacePrep-${id}-${Math.random().toString(36).slice(2, 7)}`,
-            }
-          : r
-      )
+      prev.map((r) => r.id === id ? { ...r, status: "confirmed" } : r)
     );
+    confirmSession(id)
+      .then(() => toast.success("Session confirmed! Jitsi link generated."))
+      .catch((err) => {
+        setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: "pending" } : r));
+        toast.error("Failed to confirm session: " + (err?.message ?? "Unknown error"));
+      });
   };
 
   const handleDecline = (id: string) => {
     setRequests((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: "cancelled" } : r))
     );
+    declineSession(id)
+      .then(() => toast.success("Session declined."))
+      .catch((err) => {
+        setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: "pending" } : r));
+        toast.error("Failed to decline session: " + (err?.message ?? "Unknown error"));
+      });
   };
 
   const handleProposeSubmit = (id: string) => {
-    if (!proposedDate) return;
+    if (!proposedDate || !proposedTime) return;
+    // BUG-FIX G1: reject past dates that bypass the input min attribute (e.g. manual typing)
+    if (proposedDate < format(new Date(), "yyyy-MM-dd")) {
+      toast.error("Please pick a date that isn't in the past.");
+      return;
+    }
     setRequests((prev) =>
       prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: "proposed",
-              proposedDate,
-              proposedTime,
-            }
-          : r
+        r.id === id ? { ...r, status: "proposed", proposedDate, proposedTime } : r
       )
     );
+    proposeAlternative(id, proposedDate, proposedTime)
+      .then(() => toast.success("Alternative time proposed to student."))
+      .catch((err) => {
+        setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status: "pending" } : r));
+        toast.error("Failed to propose alternative: " + (err?.message ?? "Unknown error"));
+      });
     setProposingFor(null);
     setProposedDate("");
     setProposedTime(TIME_SLOTS[0]);
@@ -190,10 +243,15 @@ export default function RequestsPage() {
   return (
     <div className="max-w-7xl mx-auto pb-20">
       {/* ── Page Header ── */}
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="mb-7 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Session Requests</h1>
-          <p className="text-sm text-gray-500">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-500/25">
+              <CalendarRange className="w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-black text-gray-900">Session Requests</h1>
+          </div>
+          <p className="text-sm text-gray-500 ml-12">
             Manage and schedule 1:1 mentorship sessions requested by students
           </p>
         </div>
@@ -309,20 +367,66 @@ export default function RequestsPage() {
 
           {/* ── Content View ── */}
           {viewMode === "calendar" ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center shadow-sm max-w-2xl mx-auto mt-4">
-              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-inner">
-                <CalendarDays className="w-8 h-8 text-blue-600" />
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-sm mb-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">{format(currentMonth, 'MMMM yyyy')}</h2>
+                <div className="flex gap-2">
+                  <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer">
+                    <ChevronRight className="w-5 h-5 rotate-180" />
+                  </button>
+                  <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer">
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Calendar View Ready</h3>
-              <p className="text-xs text-gray-500 mt-2 max-w-sm mx-auto leading-relaxed">
-                Full calendar synchronization will be available once the backend is connected. Currently displaying {filteredRequests.length} matching requests in list mode.
-              </p>
-              <button 
-                onClick={() => setViewMode("list")} 
-                className="mt-6 px-5 py-2.5 bg-blue-600 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-colors cursor-pointer"
-              >
-                Switch back to List View
-              </button>
+              
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center text-xs font-bold text-gray-400 py-2 uppercase tracking-wider">{day}</div>
+                ))}
+                
+                {eachDayOfInterval({
+                  start: startOfWeek(startOfMonth(currentMonth)),
+                  end: endOfWeek(endOfMonth(currentMonth))
+                }).map((day, idx) => {
+                  const dayRequests = filteredRequests.filter(req => {
+                    const reqDate = new Date(req.date);
+                    return isSameDay(day, reqDate);
+                  });
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`min-h-[100px] border rounded-xl p-1.5 sm:p-2 transition-all flex flex-col ${
+                        !isSameMonth(day, currentMonth) 
+                          ? 'bg-gray-50/30 border-transparent opacity-60' 
+                          : isToday(day)
+                            ? 'bg-blue-50/30 border-blue-300 shadow-sm ring-1 ring-blue-100'
+                            : 'bg-white border-gray-100 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`text-right text-xs font-bold mb-1.5 ${
+                        isToday(day) ? 'text-blue-600 bg-blue-100 w-6 h-6 flex items-center justify-center rounded-full ml-auto' : 'text-gray-500 pr-1'
+                      }`}>
+                        {format(day, 'd')}
+                      </div>
+                      <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[120px] custom-scrollbar">
+                        {dayRequests.map(req => {
+                          const cfg = STATUS_CFG[req.status];
+                          return (
+                            <div key={req.id} className={`text-[10px] px-1.5 py-1 rounded-md font-medium leading-tight ${cfg.cls} border border-opacity-50`}>
+                              <div className="font-bold flex items-center gap-1 opacity-80 mb-0.5">
+                                <Clock className="w-3 h-3" /> {req.time}
+                              </div>
+                              <div className="truncate">{req.studentName}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -423,6 +527,7 @@ export default function RequestsPage() {
                                   type="date"
                                   value={proposedDate}
                                   onChange={(e) => setProposedDate(e.target.value)}
+                                  min={format(new Date(), "yyyy-MM-dd")} // BUG-FIX G1
                                   className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                                 />
                                 <select
@@ -432,7 +537,7 @@ export default function RequestsPage() {
                                 >
                                   {TIME_SLOTS.map((t) => (
                                     <option key={t} value={t}>
-                                      {t}
+                                      {fmtTimeSlot(t)}
                                     </option>
                                   ))}
                                 </select>
@@ -456,31 +561,14 @@ export default function RequestsPage() {
                           )}
 
                           {req.status === "confirmed" && req.meetLink && (
-                            <div className="flex flex-wrap gap-2 items-center">
-                              <a
-                                href={req.meetLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20 cursor-pointer"
-                              >
-                                <Video className="w-3.5 h-3.5" /> Join Meet
-                              </a>
-                              <button
-                                onClick={() => setFeedbackModalReq(req)}
-                                className="flex items-center gap-1 bg-gray-100 text-gray-700 hover:bg-gray-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors cursor-pointer border border-gray-200"
-                              >
-                                📝 Log Feedback
-                              </button>
-                            </div>
-                          )}
-
-                          {req.status === "completed" && (
-                            <button
-                              onClick={() => setFeedbackModalReq(req)}
-                              className="flex items-center gap-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold px-3.5 py-2 rounded-lg transition-colors cursor-pointer border border-emerald-200"
+                            <a
+                              href={req.meetLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20 cursor-pointer"
                             >
-                              📝 Edit Session Notes
-                            </button>
+                              <Video className="w-3.5 h-3.5" /> Join Meet
+                            </a>
                           )}
                         </div>
                       </div>
@@ -505,107 +593,16 @@ export default function RequestsPage() {
           )}
         </>
       )}
-      {/* Mentorship Session Feedback Modal */}
-      {feedbackModalReq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900">Mentorship Session Feedback</h3>
-                  <p className="text-[11px] text-gray-500">{feedbackModalReq.studentName} • {feedbackModalReq.topic}</p>
-                </div>
-              </div>
-              <button onClick={() => setFeedbackModalReq(null)} className="text-gray-400 hover:text-gray-600">
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setRequests((prev) =>
-                  prev.map((r) =>
-                    r.id === feedbackModalReq.id ? { ...r, status: "completed" } : r
-                  )
-                );
-                setFeedbackToast(`Mentorship feedback saved for ${feedbackModalReq.studentName}!`);
-                setFeedbackModalReq(null);
-                setStrengthsInput("");
-                setImprovementsInput("");
-                setTimeout(() => setFeedbackToast(null), 3500);
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Student Readiness Rating</label>
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setRatingVal(star)}
-                      className={`text-xl transition-transform ${star <= ratingVal ? "scale-110" : "opacity-30"}`}
-                    >
-                      ⭐
-                    </button>
-                  ))}
-                  <span className="text-xs font-bold text-gray-700 ml-2">{ratingVal} / 5 Stars</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Key Strengths Identified</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Exceptional understanding of graph traversal & edge cases"
-                  value={strengthsInput}
-                  onChange={(e) => setStrengthsInput(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-900 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Areas for Improvement / Next Steps</label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g., Needs to practice System Design estimation math and rate limiting algorithms..."
-                  value={improvementsInput}
-                  onChange={(e) => setImprovementsInput(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-900 outline-none resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setFeedbackModalReq(null)}
-                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                  Save Notes & Mark Complete
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Feedback Toast */}
-      {feedbackToast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-semibold border border-gray-700 animate-in slide-in-from-bottom duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          {feedbackToast}
-        </div>
-      )}
     </div>
+  );
+}
+
+
+// Admin feature-toggle gate (Feature Controls → faculty.sessions)
+export default function RequestsPageGate() {
+  return (
+    <FeatureGate feature="faculty.sessions" title="Session Requests">
+      <RequestsPageInner />
+    </FeatureGate>
   );
 }

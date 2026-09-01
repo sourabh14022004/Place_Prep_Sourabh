@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useClerk, useUser } from "@clerk/nextjs";
 import {
   Building2,
   CalendarDays,
@@ -12,76 +11,67 @@ import {
   LogOut,
   LayoutList,
   Trophy,
+  BookOpen,
+  TrendingUp,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useFeatures } from "@/lib/use-features";
 
+/**
+ * Faculty nav items — each can be toggled from Admin → Feature Controls
+ * via its `feature` key.
+ */
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Session Requests", href: "/requests", icon: CalendarDays },
-  { name: "Doubts & Questions", href: "/doubts", icon: MessageCircle },
-  { name: "Student Matrix", href: "/students", icon: LayoutList },
-  { name: "Leaderboard", href: "/leaderboard", icon: Trophy },
-  { name: "Company Rankings", href: "/rankings", icon: Building2 },
-  { name: "Export Reports", href: "/reports", icon: Send },
+  { name: "Session Requests", href: "/requests", icon: CalendarDays, feature: "faculty.sessions" },
+  { name: "Doubts & Questions", href: "/doubts", icon: MessageCircle, feature: "faculty.doubts" },
+  { name: "Student Matrix", href: "/students", icon: LayoutList, feature: "faculty.students" },
+  { name: "Leaderboard", href: "/leaderboard", icon: Trophy, feature: "faculty.leaderboard" },
+  { name: "Company Rankings", href: "/rankings", icon: Building2, feature: "faculty.rankings" },
+  { name: "Curriculum Gap", href: "/curriculum", icon: BookOpen, feature: "faculty.curriculum" },
+  { name: "Industry Trends", href: "/trends", icon: TrendingUp, feature: "faculty.trends" },
+  { name: "Export Reports", href: "/reports", icon: Send, feature: "faculty.reports" },
 ];
 
 export function SidebarContent() {
   const pathname = usePathname();
-  const { signOut } = useClerk();
-  const { user: clerkUser, isLoaded } = useUser();
-
-  const realName = isLoaded && clerkUser ? (clerkUser.fullName || clerkUser.firstName || "Faculty Member") : "Faculty Member";
-  const realEmail = isLoaded && clerkUser ? (clerkUser.primaryEmailAddress?.emailAddress || "faculty@nst.edu") : "faculty@nst.edu";
-  const realImage = isLoaded && clerkUser ? clerkUser.imageUrl : undefined;
-  const initials = isLoaded && clerkUser && clerkUser.firstName ? `${clerkUser.firstName[0]}${clerkUser.lastName?.[0] || ""}`.toUpperCase() : "FC";
-
-  const handleLogout = async () => {
-    document.cookie = "faculty_authed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    try {
-      sessionStorage.clear();
-      localStorage.clear();
-    } catch {}
-    try {
-      if (signOut) {
-        await signOut({ redirectUrl: "/login" });
-      }
-    } catch {}
-    window.location.href = "/login";
-  };
+  const { isEnabled, isLoading } = useFeatures();
+  const visible = navigation.filter((item) => !item.feature || isLoading || isEnabled(item.feature));
 
   return (
-    <div className="flex h-full w-full flex-col bg-white pt-3">
-      {/* Faculty User Info pill */}
-      <div className="mx-3 mb-3 flex items-center gap-2.5 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 shrink-0">
-        {realImage ? (
-          <img src={realImage} alt={realName} className="h-7 w-7 rounded-full object-cover shrink-0" />
-        ) : (
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-700 text-[10px] font-bold text-white">
-            {initials}
-          </div>
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-gray-900">{realName}</p>
-          <p className="truncate text-[10px] text-gray-400 font-medium">{realEmail}</p>
+    <div className="flex h-full w-full flex-col bg-white pt-4">
+      {/* User Info */}
+      {/* <div className="mx-3 mb-4 flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-700 to-indigo-600 text-sm font-bold text-white shadow-sm">
+          PS
         </div>
-      </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-gray-900">Prof. Sharma</p>
+          <p className="truncate text-xs text-blue-600 font-medium">Computer Science Dept.</p>
+        </div>
+      </div> */}
+
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 px-3 overflow-y-auto">
-        <p className="px-3 mb-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Faculty Menu
-        </p>
-        {navigation.map((item) => {
+      <nav className="flex-1 space-y-0.5 px-3">
+        {visible.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={cn(
+                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                 isActive
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20"
+                  : "text-gray-650 hover:bg-blue-50 hover:text-blue-700"
+              )}
             >
-              <item.icon className="w-4 h-4 shrink-0" />
+              <item.icon
+                className={cn(
+                  "h-4.5 w-4.5 flex-shrink-0",
+                  isActive ? "text-white" : "text-gray-400 group-hover:text-blue-600"
+                )}
+              />
               {item.name}
             </Link>
           );
@@ -89,20 +79,21 @@ export function SidebarContent() {
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t border-gray-200 p-3 space-y-1 shrink-0">
+      <div className="border-t border-gray-200 p-3 space-y-1">
         <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" });
+            const loginUrl = process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL
+              ? `${process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL}/login`
+              : "http://localhost:3000/login";
+            window.location.href = loginUrl;
+          }}
+          className="w-full group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
         >
-          <LogOut className="w-4 h-4 shrink-0 text-gray-400 group-hover:text-red-500" />
+          <LogOut className="h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-red-500" />
           Logout
         </button>
-        <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center gap-2 px-3">
-          <img src="/newton-school-logo.png" alt="NST Logo" className="h-6 w-6 object-contain shrink-0" />
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-            PlacePrep
-          </span>
-        </div>
+        <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">NST Interview Intelligence</p>
       </div>
     </div>
   );
@@ -110,8 +101,8 @@ export function SidebarContent() {
 
 export function Sidebar() {
   return (
-    <aside className="hidden border-r border-gray-200 lg:fixed lg:top-14 lg:bottom-0 lg:flex lg:w-[216px] lg:flex-col z-40 bg-white">
+    <div className="hidden border-r border-gray-200 lg:fixed lg:top-14 lg:bottom-0 lg:flex lg:w-[var(--sidebar-width)] lg:flex-col z-50">
       <SidebarContent />
-    </aside>
+    </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
-import { Rocket, CheckCircle, Zap, Calendar } from "lucide-react";
+import { Rocket, CheckCircle, Zap, Calendar, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import Stepper from "@/components/onboarding/Stepper";
-import { saveStudentOnboarding } from "@/lib/api";
+import { submitOnboarding } from "@/lib/hooks";
 
 const readyItems = [
   "Custom roadmap based on your timeline and goals",
@@ -14,59 +15,75 @@ const readyItems = [
 
 export default function Step4() {
   const router = useRouter();
-  const { user } = useUser();
+  const [submitting, setSubmitting] = useState(false);
 
   const handleLaunch = async () => {
+    setSubmitting(true);
     try {
-      const storedCategories = sessionStorage.getItem("onboarding_categories");
-      const storedCompanies = sessionStorage.getItem("onboarding_companies");
-      const storedRatings = sessionStorage.getItem("onboarding_ratings");
-      const storedDuration = sessionStorage.getItem("onboarding_duration");
+      // Read data collected across steps from sessionStorage.
+      // GUARD FIX: deep-linking to /step4 (or expired storage) used to submit a
+      // FABRICATED profile (SDE domain, product category, Google+Amazon). Any
+      // missing step now sends the user back to that step instead.
+      const rawDomains = sessionStorage.getItem("onboarding_domains");
+      const rawCategories = sessionStorage.getItem("onboarding_categories");
+      const rawCompanies = sessionStorage.getItem("onboarding_companies");
+      const rawRatings = sessionStorage.getItem("onboarding_ratings");
 
-      const targetCategories = storedCategories ? JSON.parse(storedCategories) : ["maang", "product"];
-      const targetCompanies = storedCompanies ? JSON.parse(storedCompanies) : ["google", "amazon"];
-      const topicRatings = storedRatings ? JSON.parse(storedRatings) : {};
-      const prepDurationWeeks = storedDuration ? parseInt(storedDuration, 10) : 12;
+      if (!rawDomains || !rawCategories || !rawCompanies || !rawRatings) {
+        toast.error("Your onboarding progress is incomplete. Let's start from the beginning.");
+        router.replace("/onboarding/step1");
+        return;
+      }
 
-      const clerkUserId = user?.id;
-      const userEmail = user?.primaryEmailAddress?.emailAddress || "student@newtonschool.co";
-      const userName = user?.fullName || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || userEmail.split("@")[0];
+      const targetDomains = JSON.parse(rawDomains);
+      const targetCategories = JSON.parse(rawCategories);
+      const targetCompanySlugs = JSON.parse(rawCompanies);
+      const topicSelfRatings = JSON.parse(rawRatings);
+      const prepWeeksCommitted = parseInt(sessionStorage.getItem("onboarding_weeks") || "12", 10);
+      const targetRole = sessionStorage.getItem("onboarding_target_role") || "SDE-1";
 
-      // Save onboarding data to MongoDB Atlas dynamically from Clerk profile
-      await saveStudentOnboarding({
-        clerkUserId,
-        email: userEmail,
-        name: userName,
+      if (
+        !Array.isArray(targetDomains) || targetDomains.length === 0 ||
+        !Array.isArray(targetCategories) || targetCategories.length === 0 ||
+        !Array.isArray(targetCompanySlugs) || targetCompanySlugs.length === 0
+      ) {
+        toast.error("Some steps were skipped. Please complete them first.");
+        router.replace("/onboarding/step2");
+        return;
+      }
+
+      const result = await submitOnboarding({
+        targetDomains,
         targetCategories,
-        targetCompanies,
-        prepDurationWeeks,
-        topicRatings,
+        topicSelfRatings,
+        targetCompanySlugs,
+        prepWeeksCommitted,
+        targetRole,
       });
 
-      if (storedCompanies) {
-        const companies: string[] = JSON.parse(storedCompanies);
-        const companyData: Record<string, { name: string; initial: string; color: string }> = {
-          google:    { name: "Google",    initial: "G", color: "bg-blue-600" },
-          amazon:    { name: "Amazon",    initial: "A", color: "bg-blue-500" },
-          flipkart:  { name: "Flipkart",  initial: "F", color: "bg-blue-500" },
-          microsoft: { name: "Microsoft", initial: "M", color: "bg-blue-600" },
-          tcs:       { name: "TCS",       initial: "T", color: "bg-blue-600" },
-          razorpay:  { name: "Razorpay",  initial: "R", color: "bg-blue-800" },
-        };
-        const roadmapEntries = companies
-          .filter((slug) => companyData[slug])
-          .map((slug) => ({ slug, ...companyData[slug], role: "SDE-1", weeks: 12, addedAt: new Date().toISOString() }));
-        if (roadmapEntries.length > 0) {
-          sessionStorage.setItem("roadmap_companies", JSON.stringify(roadmapEntries));
-        }
-      }
+      // Clear session storage to prevent stale data
+      sessionStorage.removeItem("onboarding_domains");
+      sessionStorage.removeItem("onboarding_categories");
+      sessionStorage.removeItem("onboarding_companies");
+      sessionStorage.removeItem("onboarding_ratings");
+      sessionStorage.removeItem("onboarding_weeks");
+      sessionStorage.removeItem("onboarding_target_role");
+
+      // Force cache invalidation so the new profile loads
+      const { mutate } = await import('swr');
+      await mutate('/api/user/me');
+
       sessionStorage.setItem("has_onboarded", "true");
-      document.cookie = "has_onboarded=true; path=/; max-age=31536000";
-      document.cookie = "student_authed=true; path=/; max-age=31536000";
-    } catch (err) {
-      console.warn("Failed to persist onboarding data:", err);
+      toast.success(`Roadmap created! +${(result as any)?.xpAwarded ?? 100} XP earned.`);
+      router.push("/onboarding/step5");
+    } catch (err: any) {
+      // FAILURE FIX: the old code routed to /dashboard even when NOTHING was
+      // saved — leaving users with no roadmap and no way to know. Stay here so
+      // they can retry.
+      toast.error(err?.message ?? "Could not save your roadmap. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-    router.push("/dashboard");
   };
 
   return (
@@ -97,7 +114,7 @@ export default function Step4() {
             <span className="font-bold text-gray-900 text-sm">PlacePrep</span>
           </div>
 
-          <Stepper currentStep={4} totalSteps={4} />
+          <Stepper currentStep={4} totalSteps={5} />
           <p className="text-xs text-gray-400 mt-2 mb-6">Step 4 of 4</p>
 
           {/* Hero */}
@@ -131,9 +148,14 @@ export default function Step4() {
 
           <button
             onClick={handleLaunch}
-            className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+            disabled={submitting}
+            className="w-full bg-gray-900 text-white py-3 rounded-lg text-sm font-bold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Rocket className="w-4 h-4" /> Launch My Dashboard
+            {submitting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Setting up your roadmap...</>
+            ) : (
+              <><Rocket className="w-4 h-4" /> Launch My Dashboard</>
+            )}
           </button>
         </div>
       </div>

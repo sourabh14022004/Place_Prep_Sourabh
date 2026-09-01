@@ -1,99 +1,26 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { FeatureGate } from "@/lib/features";
+import { CompanyLogo } from "@/components/ui";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   CheckCircle, Lock, ChevronDown, ChevronUp,
   ExternalLink, Zap, Play, ChevronRight, BarChart2, ClipboardList,
   Trash2, Timer, Trophy, XCircle, Info
 } from "lucide-react";
+import { toast } from "sonner";
 import { Suspense } from "react";
-import {
-  getUserRoadmapCompanies,
-  removeRoadmapCompany,
-  type UserRoadmapCompany,
-} from "@/lib/mock-data";
+import useSWR, { mutate as globalMutate } from "swr";
+import { useRoadmap, useCompanies, fetcher } from "@/lib/hooks";
+import { type UserRoadmapCompany } from "@/lib/constants";
+import ErrorState from "@/components/ErrorState";
+import { usePageTitle } from "@/lib/use-page-title";
 
-// ─── Company logo map ────────────────────────────────────────────────────────
-const COMPANY_LOGOS: Record<string, string> = {
-  google:    "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg",
-  microsoft: "https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg",
-  amazon:    "https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg",
-  apple:     "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
-  meta:      "https://upload.wikimedia.org/wikipedia/commons/7/7b/Meta_Platforms_Inc._logo.svg",
-  netflix:   "https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg",
-  flipkart:  "https://upload.wikimedia.org/wikipedia/commons/1/18/Flipkart_logo.png",
-  tcs:       "https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg",
-  razorpay:  "https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg",
-  atlassian: "https://upload.wikimedia.org/wikipedia/commons/c/c8/Atlassian_logo.svg",
-};
-
-function getLogoUrl(slug: string): string | null {
-  return COMPANY_LOGOS[slug.toLowerCase()] ?? null;
-}
-
-function CompanyLogo({
-  logoUrl,
-  name,
-  initial,
-  fallbackClass,
-}: {
-  logoUrl: string | null;
-  name: string;
-  initial: string;
-  fallbackClass: string;
-}) {
-  const [error, setError] = useState(false);
-  
-  if (logoUrl && !error) {
-    return (
-      <img
-        className="w-7 h-7 object-contain"
-        src={logoUrl}
-        alt={name}
-        onError={() => setError(true)}
-      />
-    );
-  }
-  
-  return <span className={`text-base font-bold ${fallbackClass}`}>{initial}</span>;
-}
-
-const EXPLORE_SUGGESTIONS = [
-  {
-    slug: "tcs",
-    name: "TCS",
-    initial: "T",
-    role: "Ninja / Digital",
-    totalXP: 1200,
-    weeks: 6,
-  },
-  {
-    slug: "razorpay",
-    name: "Razorpay",
-    initial: "R",
-    role: "SDE-1",
-    totalXP: 1800,
-    weeks: 8,
-  },
-  {
-    slug: "atlassian",
-    name: "Atlassian",
-    initial: "A",
-    role: "Software Engineer",
-    totalXP: 1500,
-    weeks: 8,
-  },
-  {
-    slug: "netflix",
-    name: "Netflix",
-    initial: "N",
-    role: "SDE",
-    totalXP: 2200,
-    weeks: 10,
-  }
-];
-
+// Credentialed fetcher for SWR — sends JWT cookie with every request.
+// Uses the shared fetcher from lib/hooks (imported above): the local copy had
+// no timeout, so a hung week-questions request left the week panel spinning
+// indefinitely, and no res.ok check, so an error body was rendered as data.
 
 
 // ─── Compact Active Roadmap Card ────────────────────────────────────────────
@@ -109,9 +36,10 @@ function ActiveRoadmapCard({
   onRemove?: (slug: string) => void;
 }) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const logoUrl = getLogoUrl(company.slug);
-  const totalQ = company.weeks.reduce((s, w) => s + w.questions.length, 0);
-  const doneQ  = company.weeks.reduce((s, w) => s + w.questions.filter(q => q.done).length, 0);
+    // BUG-R8 FIX: Was using w.questions.length (always 0 — API returns counts not arrays)
+  // Now correctly uses totalQuestions/doneQuestions from the week object
+  const totalQ = company.weeks.reduce((s, w) => s + (w.totalQuestions ?? 0), 0);
+  const doneQ  = company.weeks.reduce((s, w) => s + (w.doneQuestions ?? 0), 0);
   const pct = totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0;
   const daysElapsed = company.currentWeek * 7;
   const totalDays   = company.totalWeeks  * 7;
@@ -128,7 +56,7 @@ function ActiveRoadmapCard({
     >
       {/* Logo */}
       <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
-        <CompanyLogo logoUrl={logoUrl} name={company.name} initial={company.initial} fallbackClass="text-blue-600" />
+        <CompanyLogo name={company.name} size={36} />
       </div>
 
       {/* Info */}
@@ -175,18 +103,22 @@ function ActiveRoadmapCard({
 }
 
 // ─── Compact Explore Roadmap Card ────────────────────────────────────────────
-function ExploreRoadmapCard({ company }: { company: typeof EXPLORE_SUGGESTIONS[0] }) {
-  const logoUrl = getLogoUrl(company.slug);
-
+function ExploreRoadmapCard({ company }: { company: any }) {
+  
   return (
     <div className="flex items-center gap-4 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all shrink-0" style={{ minWidth: 240 }}>
       <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
-        <CompanyLogo logoUrl={logoUrl} name={company.name} initial={company.initial} fallbackClass="text-gray-700" />
+        <CompanyLogo name={company.name} size={36} />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-gray-900 truncate">{company.name}</p>
-        <p className="text-[10px] text-gray-500">{company.role} · {company.weeks}w plan</p>
-        <p className="text-[10px] text-blue-600 font-semibold mt-0.5">{company.totalXP} XP available</p>
+        <p className="text-[10px] text-gray-500 capitalize">{company.role}</p>
+        {/* HONESTY FIX: showed a fabricated "8w plan · N XP available" — plan
+            length is user-chosen and XP depends on difficulty mix. Show the real
+            question-pool size instead. */}
+        <p className="text-[10px] text-blue-600 font-semibold mt-0.5">
+          {company.questions != null ? `${company.questions.toLocaleString()} tagged questions` : "Explore interview intel"}
+        </p>
       </div>
       <Link
         href={`/companies/${company.slug}/practice`}
@@ -203,35 +135,115 @@ function ExploreRoadmapCard({ company }: { company: typeof EXPLORE_SUGGESTIONS[0
 
 // ─── Main Roadmap Page Content ───────────────────────────────────────────────
 function RoadmapContent() {
+  usePageTitle("My Roadmap");
   const searchParams = useSearchParams();
-  const [companies, setCompanies] = useState<UserRoadmapCompany[]>(getUserRoadmapCompanies);
+
+  // Real roadmaps from API
+  const { data: roadmapData, mutate, isLoading, error } = useRoadmap();
+  const { data: companiesResp } = useCompanies();
+
+  const allCompanies: any[] = Array.isArray(companiesResp) ? companiesResp : [];
+
+  // BUG-R7 FIX: fetcher already unwraps .data, so roadmapData IS the raw array.
+  // The old triple-unwrap (data?.data?.roadmaps ?? data?.roadmaps ?? data) was fragile.
+  const companies: UserRoadmapCompany[] = (
+    (Array.isArray(roadmapData) ? roadmapData : []) as any[]
+  ).map((r: any) => {
+    // Deduplicate questionIds across weeks at read time.
+    // Old roadmaps (built with Promise.all) may have the same question stored in
+    // multiple weeks. We strip duplicates here so WeekQuestions can use the stored
+    // IDs directly — first week that claims a question wins.
+    const seenIds = new Set<string>();
+    const weeks = (r.weeks || r.tasks || []).map((w: any) => {
+      const allIds = (w.questionIds || []).map((id: any) => id.toString());
+      const uniqueIds = allIds.filter((id: string) => !seenIds.has(id));
+      uniqueIds.forEach((id: string) => seenIds.add(id));
+      return {
+        weekNum: w.weekNumber || w.weekNum,
+        topic: w.topicLabel || w.topic,
+        totalQuestions: w.totalQuestions ?? 5,
+        doneQuestions: w.doneQuestions ?? 0,
+        status: w.status || "active",
+        questions: w.questions || [],
+        questionIds: uniqueIds,
+      };
+    });
+    return {
+      slug: r.companySlug,
+      name: r.companyName,
+      initial: r.companyName?.charAt(0) || "?",
+      color: "from-blue-500/20 to-blue-500/5",
+      role: r.roleName,
+      totalWeeks: r.weeksCommitted ?? 12,
+      currentWeek: r.currentWeek ?? 1,
+      pctComplete: r.pctComplete ?? 0,
+      roadmapId: r._id?.toString() ?? r.roadmapId ?? undefined,
+      weeks,
+    };
+  });
+
   const initialSlug = searchParams.get("company") ?? companies[0]?.slug ?? "";
   const [activeSlug, setActiveSlug] = useState(initialSlug);
 
-  // Sync state if returned from other pages
-  useEffect(() => {
-    setTimeout(() => {
-      setCompanies(getUserRoadmapCompanies());
-    }, 0);
-  }, []);
+  // Stable primitive list of slugs — the old effect depended on `companies`,
+  // a fresh array identity each render, causing it to fire on EVERY render.
+  const companySlugs = useMemo(() => companies.map((c) => c.slug), [companies]);
 
   useEffect(() => {
     const slug = searchParams.get("company");
-    if (slug && companies.some((c) => c.slug === slug)) {
-      setTimeout(() => setActiveSlug(slug), 0);
+    if (slug && companySlugs.includes(slug)) {
+      setActiveSlug(slug);
     }
-  }, [searchParams, companies]);
+  }, [searchParams, companySlugs]);
 
-  const handleRemove = (slug: string) => {
-    removeRoadmapCompany(slug);
-    const updated = getUserRoadmapCompanies();
-    setCompanies(updated);
+  const exploreSuggestions = allCompanies
+    .filter((c: any) => !companies.some(rm => rm.slug === c.slug))
+    .slice(0, 5)
+    .map((c: any) => ({
+      slug: c.slug,
+      name: c.name,
+      initial: c.name.charAt(0),
+      // BUG-R11 FIX: c.type doesn't exist on Company model — use c.category
+      role: c.category || "SDE-1",
+      // HONESTY FIX: these were fabricated (count*10 XP, fixed 8 weeks). The
+      // real plan length is user-chosen at add-time, so show the question pool
+      // size instead of inventing an XP total and a duration.
+      questions: c.questionCount ?? null,
+    }));
+
+  const handleRemove = async (slug: string) => {
+    try {
+      const res = await fetch(`/api/user/me/roadmap/${slug}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete roadmap');
+      mutate();
+      toast.success("Roadmap removed successfully");
+    } catch {
+      toast.error("Failed to remove roadmap");
+    }
     if (activeSlug === slug) {
-      setActiveSlug(updated[0]?.slug ?? "");
+      const remaining = companies.filter(c => c.slug !== slug);
+      setActiveSlug(remaining[0]?.slug ?? "");
     }
   };
 
   const activeCompany = companies.find((c) => c.slug === activeSlug) ?? companies[0];
+
+  if (error) {
+    return <ErrorState error={error} title="Couldn't load your roadmap" onRetry={() => mutate()} />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 bg-gray-100 rounded-lg w-48 animate-pulse" />
+        <div className="flex gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="min-w-[300px] h-52 bg-gray-100 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!activeCompany || companies.length === 0) {
     return (
@@ -303,46 +315,165 @@ function RoadmapContent() {
       <section className="mt-12">
         <h2 className="text-lg font-semibold text-gray-900 mb-5">Explore More Roadmaps</h2>
         <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1">
-          {EXPLORE_SUGGESTIONS.map((co) => (
-            <div key={co.slug}>
-              <ExploreRoadmapCard company={co} />
+          {exploreSuggestions.length > 0 ? (
+            exploreSuggestions.map((co) => (
+              <div key={co.slug}>
+                <ExploreRoadmapCard company={co} />
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-gray-400 py-4 w-full text-center border-2 border-dashed border-gray-100 rounded-xl">
+              You have explored all available companies!
             </div>
-          ))}
+          )}
         </div>
       </section>
 
       {/* ── Active Roadmap Detail View ── */}
       <div id="roadmap-curriculum">
         <h2 className="text-lg font-semibold text-gray-900 mb-5 border-t pt-8">Roadmap Curriculum</h2>
-        <RoadmapCurriculumView company={activeCompany} />
+        {/* key forces a synchronous remount on company switch — no flicker */}
+        <RoadmapCurriculumView key={activeCompany.slug} company={activeCompany} />
       </div>
     </div>
   );
 }
 
+function WeekQuestions({
+  companySlug,
+  topic,
+  totalQuestions,
+  weeksCommitted,
+  roadmapId,
+  questionIds = [],
+  onQuestionClick,
+}: {
+  companySlug: string;
+  topic: string;
+  totalQuestions: number;
+  weeksCommitted: number;
+  roadmapId?: string;
+  questionIds?: string[];
+  onQuestionClick?: (qId: string) => void;
+}) {
+  const minFrequency = weeksCommitted <= 4 ? 0.6 : weeksCommitted <= 6 ? 0.4 : weeksCommitted <= 8 ? 0.25 : weeksCommitted <= 12 ? 0.1 : 0;
+  const limit = totalQuestions || 10;
+
+  // When the stored roadmap has question IDs, fetch those specific questions.
+  // This guarantees each week shows exactly its assigned questions, with no
+  // cross-week duplicates. Fall back to topic+frequency query only when IDs
+  // are absent (very old roadmaps predating BUG-R10).
+  const hasStoredIds = questionIds.length > 0;
+  const key = hasStoredIds
+    ? `/api/roadmap/week-questions?ids=${[...questionIds].sort().join(',')}`
+    : `/api/roadmap/week-questions?company=${companySlug}&topic=${encodeURIComponent(topic)}&limit=${limit}&minFrequency=${minFrequency}`;
+  const { data: weekData, isLoading } = useSWR(key, fetcher);
+
+  // Completed-questions: drives green checkmarks and persists across refresh
+  const { data: completedData } = useSWR('/api/user/me/completed-questions', fetcher);
+
+  // weekData from /api/roadmap/week-questions returns { questions: [], total: N }
+  const questions = weekData?.questions ?? [];
+  const completedIds = new Set(
+    (completedData?.completedQuestions ?? []).map((q: any) => q.questionId)
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-14 bg-white border border-gray-200 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!questions || questions.length === 0) {
+    return (
+      <div className="text-center py-6 text-gray-500 text-sm">
+        No questions found for {topic}. Questions may be added soon.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {questions.map((q: any) => {
+        const qId = (q._id || q.id)?.toString();
+        const isDone = completedIds.has(qId);
+        // BUG-R1 FIX: Question model fields — .problemSummary not .title, .difficulty not .diff
+        // XP is derived from difficulty only (Easy=10 / Medium=25 / Hard=50) — same mapping
+        // as XP_BY_DIFFICULTY in student.service.ts and the dashboard todayQs calculation.
+        // Do NOT use q.xpValue: it defaults to 10 for all questions in many DB records,
+        // which caused the mismatch between dashboard (25 XP) and roadmap (10 XP).
+        const title = q.problemSummary || q.title || 'Untitled Question';
+        const difficulty = q.difficulty || q.diff || 'Medium';
+        const xp = difficulty === 'Hard' ? 50 : difficulty === 'Medium' ? 25 : 10;
+        return (
+          <div
+            key={qId}
+            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors cursor-pointer group gap-2 sm:gap-4"
+            onClick={() => onQuestionClick?.(qId)}
+          >
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
+                {isDone && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+              </div>
+              <span className={`font-semibold text-sm truncate ${isDone ? 'text-gray-400 line-through' : 'text-gray-700 group-hover:text-blue-600'}`}>
+                {title}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0 ml-8 sm:ml-0">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                difficulty === 'Easy' ? 'bg-green-50 text-green-700 border-green-200' :
+                difficulty === 'Medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                'bg-red-50 text-red-700 border-red-200'
+              }`}>
+                {difficulty}
+              </span>
+              <span className="text-xs font-bold text-orange-500 flex items-center gap-0.5">
+                +{xp} XP
+              </span>
+              <a
+                href={q.leetcodeUrl || q.sourceUrl || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-blue-500 hover:text-blue-700 p-1 rounded-xl hover:bg-blue-50 transition-colors"
+                aria-label={`Open ${title} on LeetCode`}
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
+  const router = useRouter();
   const [expandedWeek, setExpandedWeek] = useState<number | null>(company.currentWeek);
 
-  // Sync expanded week when company changes
+  // Sync expanded week when the selected company changes.
+  // CLEANUP: this used to defer via setTimeout(...,0), which made the accordion
+  // visibly collapse/re-expand one tick late on every switch. A keyed remount
+  // (below) resets state synchronously; this effect is only a fallback for
+  // in-place data refreshes of the SAME company (e.g. SWR revalidation).
   useEffect(() => {
+    setExpandedWeek(company.currentWeek);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    setTimeout(() => setExpandedWeek(company.currentWeek), 0);
   }, [company.slug]);
 
-  const logoUrl = getLogoUrl(company.slug);
-
+  
   return (
     <div className="pb-12">
       {/* Hero Header */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-200 shrink-0">
-            {logoUrl ? (
-              <img src={logoUrl} alt={company.name} className="w-8 h-8 object-contain" />
-            ) : (
-              <span className={`text-xl font-bold text-blue-600`}>{company.initial}</span>
-            )}
-          </div>
+          <CompanyLogo name={company.name} size={56} />
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
             <p className="text-gray-500 text-sm">{company.role} · {company.totalWeeks}-week plan</p>
@@ -373,7 +504,7 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
             </Link>
             <Link
               href={`/companies/${company.slug}`}
-              className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm"
+              className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50:bg-slate-800/60 border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm"
             >
                Intel
             </Link>
@@ -384,7 +515,7 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
       {/* Curriculum List */}
       <div className="space-y-4">
         {company.weeks.map((week) => {
-          const isExpanded = expandedWeek === week.weekNumber;
+          const isExpanded = expandedWeek === week.weekNum;
           const isDone = week.status === "done";
           const isActive = week.status === "active";
           const isLocked = week.status === "locked";
@@ -392,15 +523,15 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
 
           return (
             <div 
-              key={week.weekNumber} 
+              key={week.weekNum} 
               className={`border rounded-xl bg-white overflow-hidden transition-all ${
                 isActive ? 'border-blue-200 shadow-sm' : 'border-gray-200'
               }`}
             >
               <div 
-                className={`p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50:bg-slate-800/60/50 ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                 onClick={() => {
-                  if (!isLocked) setExpandedWeek(isExpanded ? null : week.weekNumber);
+                  if (!isLocked) setExpandedWeek(isExpanded ? null : week.weekNum);
                 }}
               >
                 <div className="flex items-center gap-4">
@@ -413,7 +544,7 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
                       <span className={`text-[10px] font-bold uppercase tracking-wider ${
                         isDone ? 'text-gray-500' : isActive ? 'text-blue-600' : 'text-gray-400'
                       }`}>
-                        WEEK {week.weekNumber}
+                        WEEK {week.weekNum}
                       </span>
                       {isActive && (
                         <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
@@ -453,43 +584,16 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
               </div>
 
               {isExpanded && !isLocked && (
-                <div className="border-t border-gray-100 bg-gray-50/30 p-5">
-                  <div className="space-y-3">
-                    {week.questions.map((q) => (
-                      <div key={q.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors cursor-pointer group gap-2 sm:gap-4">
-                        <div className="flex items-start sm:items-center gap-3 min-w-0">
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${q.done ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
-                            {q.done && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                          </div>
-                          <span className={`font-semibold text-sm truncate ${q.done ? 'text-gray-400 line-through' : 'text-gray-700 group-hover:text-blue-600'}`}>
-                            {q.title}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3 shrink-0 ml-8 sm:ml-0">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            q.diff === 'Easy' ? 'bg-green-50 text-green-700 border-green-200' :
-                            q.diff === 'Medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            'bg-red-50 text-red-700 border-red-200'
-                          }`}>
-                            {q.diff}
-                          </span>
-                          <span className="text-xs font-bold text-orange-500 flex items-center gap-0.5">
-                            +{q.xp}
-                          </span>
-                          <a 
-                            href={q.leetcodeUrl || '#'} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-blue-500 hover:text-blue-700 p-1 rounded-md hover:bg-blue-50 transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="border-t border-gray-100 bg-gray-50 p-5">
+                  <WeekQuestions
+                    companySlug={company.slug}
+                    topic={week.topic}
+                    totalQuestions={week.totalQuestions}
+                    weeksCommitted={company.totalWeeks}
+                    roadmapId={company.roadmapId}
+                    questionIds={week.questionIds ?? []}
+                    onQuestionClick={(qId) => router.push(`/practice/${qId}`)}
+                  />
                 </div>
               )}
             </div>
@@ -500,7 +604,7 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
   );
 }
 
-export default function RoadmapPage() {
+function RoadmapPageInner() {
   return (
     <Suspense
       fallback={
@@ -516,5 +620,14 @@ export default function RoadmapPage() {
     >
       <RoadmapContent />
     </Suspense>
+  );
+}
+
+// Admin feature-toggle gate (Feature Controls → student.roadmap)
+export default function RoadmapPageGate() {
+  return (
+    <FeatureGate feature="student.roadmap" title="My Roadmap">
+      <RoadmapPageInner  />
+    </FeatureGate>
   );
 }

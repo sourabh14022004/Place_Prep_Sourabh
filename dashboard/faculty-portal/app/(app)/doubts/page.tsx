@@ -1,13 +1,14 @@
 "use client";
+import { FeatureGate } from "@/lib/use-features";
 import { useState, useEffect, useRef } from "react";
 import {
   MessageCircle, ChevronDown, ChevronUp,
   Clock, CheckCircle2, AlertCircle, Send, Tag,
-  Inbox, BookOpen, Sparkles, Filter, Search,
+  Inbox, Filter, Search,
 } from "lucide-react";
-import { mockFacultyDoubts } from "@/lib/mock-data";
-import { FacultyDoubt, DoubtStatus, DoubtTag, DoubtReply } from "@/lib/mock-data";
+import { FacultyDoubt, DoubtStatus, DoubtTag } from "@/lib/types";
 import { useFaculty } from "@/lib/context/FacultyContext";
+import { getDoubts, replyToDoubt, resolveDoubt } from "@/lib/api";
 
 // ── Status config ──────────────────────────────────────
 const STATUS_MAP: Record<DoubtStatus, { label: string; dot: string; badge: string; icon: React.ElementType }> = {
@@ -26,6 +27,15 @@ const TAG_MAP: Record<DoubtTag, { bg: string; text: string; border: string }> = 
   "Web Development":  { bg: "bg-cyan-50",    text: "text-cyan-700",   border: "border-cyan-200"   },
   "Aptitude":         { bg: "bg-amber-50",   text: "text-amber-700",  border: "border-amber-200"  },
 };
+
+/**
+ * Domain scoping now happens server-side: GET /api/faculty/doubts only returns
+ * doubts whose tag is in this faculty member's admin-assigned doubtDomains
+ * (plus any domain with no faculty assigned at all). The client no longer
+ * filters by subject — the previous SUBJECT_ALIASES map existed only to bridge
+ * long-form subject names to short tags, and keeping a second filter here would
+ * be a place for the two to silently disagree.
+ */
 
 function timeAgo(iso: string) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -55,10 +65,9 @@ function StatusBadge({ status }: { status: DoubtStatus }) {
 }
 
 function DoubtCard({
-  doubt, isMySubject, onReply, onResolve,
+  doubt, onReply, onResolve,
 }: {
   doubt: FacultyDoubt;
-  isMySubject: boolean;
   onReply: (id: string, text: string) => void;
   onResolve: (id: string) => void;
 }) {
@@ -103,11 +112,6 @@ function DoubtCard({
           {/* Top meta row */}
           <div className="flex flex-wrap items-center gap-1.5 mb-2">
             <TagPill tag={doubt.tag} />
-            {isMySubject && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full">
-                <Sparkles className="w-2.5 h-2.5" /> Matches expertise
-              </span>
-            )}
             <StatusBadge status={doubt.status} />
             <span className="ml-auto text-[11px] text-gray-400 flex items-center gap-1">
               <Clock className="w-3 h-3" /> {timeAgo(doubt.createdAt)}
@@ -233,24 +237,66 @@ function DoubtCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DoubtsPage() {
+function DoubtsPageInner() {
   const { currentFaculty, updateFacultySolvedCount } = useFaculty();
-  const [doubts, setDoubts] = useState<FacultyDoubt[]>(mockFacultyDoubts);
+  const [doubts, setDoubts] = useState<FacultyDoubt[]>([]);
   const [statusFilter, setStatusFilter] = useState<"All" | DoubtStatus>("All");
-  const [subjectFilter, setSubjectFilter] = useState<"My Subjects" | "All Doubts">("My Subjects");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(t);
-  }, []);
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
+    getDoubts()
+      .then((data) => {
+        if (cancelled) return;
+        const mapped: FacultyDoubt[] = data.map((d: any) => ({
+          id: d._id,
+          studentName: d.studentName ?? (typeof d.studentId === "object" ? d.studentId?.fullName : "Student"),
+          studentInitials: (
+            d.studentName ?? (typeof d.studentId === "object" ? d.studentId?.fullName : "Student")
+          ).split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase(),
+          batch: typeof d.studentId === "object" ? d.studentId?.batch ?? "2024" : "2024",
+          subject: d.subject,
+          body: d.body,
+          tag: (d.tag ?? "General") as DoubtTag,
+          status: d.status as DoubtStatus,
+          createdAt: d.createdAt,
+          replies: (d.replies ?? []).map((r: any) => ({
+            id: r._id ?? String(Math.random()),
+            author: r.authorRole === "faculty" ? "faculty" : "student",
+            authorName: r.authorName,
+            body: r.body,
+            sentAt: r.sentAt,
+          })),
+        }));
+        setDoubts(mapped);
+      })
+      // Was `.catch(() => {})`, which silently swallowed the TypeError thrown by
+      // the old destructuring bug and left the page showing "No doubts found"
+      // as if the inbox were genuinely empty. Surface failures instead.
+      .catch((e) => {
+        if (cancelled) return;
+        setLoadError(e instanceof Error ? e : new Error("Failed to load doubts"));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   const handleReply = (id: string, text: string) => {
     const doubt = doubts.find((d) => d.id === id);
     if (doubt?.status === "pending" && currentFaculty) {
       updateFacultySolvedCount(currentFaculty.id);
     }
+    // Fire API call (optimistic — UI updates regardless)
+    replyToDoubt(id, text).catch(() => {});
     setDoubts((prev) =>
       prev.map((d) => {
         if (d.id !== id) return d;
@@ -273,13 +319,13 @@ export default function DoubtsPage() {
   };
 
   const handleResolve = (id: string) => {
+    resolveDoubt(id).catch(() => {});
     setDoubts((prev) => prev.map((d) => (d.id === id ? { ...d, status: "resolved" } : d)));
   };
 
-  const scopedDoubts =
-    subjectFilter === "My Subjects" && currentFaculty
-      ? doubts.filter((d) => currentFaculty.subjects.includes(d.tag))
-      : doubts;
+  // Everything returned by the API is already scoped to this faculty member's
+  // assigned domains, so there is nothing left to filter client-side.
+  const scopedDoubts = doubts;
 
   const afterStatusFilter =
     statusFilter === "All" ? scopedDoubts : scopedDoubts.filter((d) => d.status === statusFilter);
@@ -342,15 +388,18 @@ export default function DoubtsPage() {
   return (
     <div className="max-w-7xl mx-auto pb-20">
       {/* ── Page Header ── */}
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Doubts &amp; Questions</h1>
-          <p className="text-sm text-gray-500">
-            Answer student questions across all topics {counts.pending > 0 && (
-              <span className="font-semibold text-amber-600">• {counts.pending} waiting for your reply</span>
-            )}
-          </p>
+      <div className="mb-7">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="p-2 bg-blue-50 rounded-lg">
+            <MessageCircle className="w-5 h-5 text-blue-600" />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900">Doubts &amp; Questions</h1>
         </div>
+        <p className="text-sm text-gray-500 ml-[52px]">
+          Answer student questions across all topics · {counts.pending > 0 && (
+            <span className="font-semibold text-amber-600">{counts.pending} waiting for your reply</span>
+          )}
+        </p>
       </div>
 
       {isLoading ? (
@@ -364,6 +413,20 @@ export default function DoubtsPage() {
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-gray-100 animate-pulse rounded-xl" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-16 bg-white border border-red-200 rounded-2xl">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-400" />
+          </div>
+          <p className="text-sm font-bold text-gray-600">Couldn't load doubts</p>
+          <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">{loadError.message}</p>
+          <button
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+          >
+            Try again
+          </button>
         </div>
       ) : (
         <>
@@ -399,23 +462,9 @@ export default function DoubtsPage() {
               />
             </div>
 
-            {/* Scope toggle */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
-              {(["All Doubts", "My Subjects"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setSubjectFilter(f)}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                    subjectFilter === f
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {f === "My Subjects" && <BookOpen className="w-3 h-3 inline mr-1" />}
-                  {f}
-                </button>
-              ))}
-            </div>
+            {/* Scope toggle removed: the API only returns doubts in this faculty
+                member's assigned domains, so "All Doubts" vs "My Subjects" would
+                render identical lists and imply a wider pool than exists. */}
 
             {/* Status pills */}
             <div className="flex items-center gap-1">
@@ -448,14 +497,17 @@ export default function DoubtsPage() {
                   <MessageCircle className="w-8 h-8 text-gray-200" />
                 </div>
                 <p className="text-sm font-bold text-gray-400">No doubts found</p>
-                <p className="text-xs text-gray-300 mt-1">Try changing your filter or search query</p>
+                <p className="text-xs text-gray-300 mt-1">
+                  {doubts.length === 0
+                    ? "Doubts in your assigned domains will appear here."
+                    : "Try changing your filter or search query"}
+                </p>
               </div>
             ) : (
               filtered.map((d) => (
                 <DoubtCard
                   key={d.id}
                   doubt={d}
-                  isMySubject={currentFaculty ? currentFaculty.subjects.includes(d.tag) : false}
                   onReply={handleReply}
                   onResolve={handleResolve}
                 />
@@ -465,5 +517,15 @@ export default function DoubtsPage() {
         </>
       )}
     </div>
+  );
+}
+
+
+// Admin feature-toggle gate (Feature Controls → faculty.doubts)
+export default function DoubtsPageGate() {
+  return (
+    <FeatureGate feature="faculty.doubts" title="Doubts & Questions">
+      <DoubtsPageInner />
+    </FeatureGate>
   );
 }

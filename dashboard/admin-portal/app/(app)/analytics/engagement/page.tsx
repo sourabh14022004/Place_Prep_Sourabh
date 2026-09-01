@@ -30,8 +30,8 @@ export default function EngagementPage() {
   if (!data) return null;
 
   const kpis = [
-    { label: "Students Online Now", value: data.currentOnline.students, icon: GraduationCap, color: "blue",   sub: "live" },
-    { label: "Faculty Online Now",  value: data.currentOnline.faculty,  icon: Users,         color: "indigo", sub: "live" },
+    { label: "Students Online Now", value: data?.currentOnline?.students ?? 0, icon: GraduationCap, color: "blue",   sub: "live" },
+    { label: "Faculty Online Now",  value: data?.currentOnline?.faculty ?? 0,  icon: Users,         color: "indigo", sub: "live" },
     { label: "DAU — Students",      value: data.dailyActive.at(-1)?.students ?? 0, icon: TrendingUp, color: "blue",  sub: "today" },
     { label: "DAU — Faculty",       value: data.dailyActive.at(-1)?.faculty ?? 0,  icon: Wifi,      color: "amber", sub: "today" },
   ];

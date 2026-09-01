@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Star, ChevronLeft, ChevronRight, Users, Activity, Target } from "lucide-react";
+import { Search, Star, ChevronLeft, ChevronRight, Users, Activity, Target, UserX } from "lucide-react";
 import { useFaculty } from "@/lib/hooks";
-import { mockFaculty } from "@/lib/mock-data";
 
 // Deterministic avatar gradient from name
 const GRADIENTS = [
@@ -74,11 +73,15 @@ export default function FacultyPage() {
   const { faculty, total, isLoading } = useFaculty(currentPage, itemsPerPage, debouncedSearch);
   const totalPages = Math.ceil(total / itemsPerPage);
 
-  // Summary stats from mock
-  const totalSessions = mockFaculty.reduce((s, f) => s + f.accepted + f.declined, 0);
-  const avgSat = (mockFaculty.reduce((s, f) => s + f.satisfaction, 0) / mockFaculty.length).toFixed(2);
-  const avgResp = Math.round(mockFaculty.reduce((s, f) => s + f.responseRate, 0) / mockFaculty.length);
-  const activeCount = mockFaculty.filter(f => f.status === "ACTIVE").length;
+  // Summary stats derived from real API data
+  const totalSessions = faculty.reduce((s: number, f: any) => s + (f.acceptCount ?? 0) + (f.declineCount ?? 0), 0);
+  const avgSat = faculty.length > 0
+    ? (faculty.reduce((s: number, f: any) => s + (f.satisfactionAvg ?? 0), 0) / faculty.length).toFixed(1)
+    : '0.0';
+  const avgResp = faculty.length > 0
+    ? Math.round(faculty.reduce((s: number, f: any) => s + (f.responseRate ?? 0), 0) / faculty.length)
+    : 0;
+  const activeCount = faculty.filter((f: any) => f.status === 'ACTIVE').length;
 
   return (
     <div className="space-y-5">
@@ -86,7 +89,7 @@ export default function FacultyPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Faculty</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Performance analytics across {mockFaculty.length} faculty members.</p>
+          <p className="text-sm text-gray-500 mt-0.5">Performance analytics across {total} faculty members.</p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -103,10 +106,10 @@ export default function FacultyPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
         {[
-          { icon: Users,    label: "Total Faculty",     value: mockFaculty.length, color: "blue" },
-          { icon: Activity, label: "Active Now",         value: activeCount,        color: "indigo" },
-          { icon: Star,     label: "Avg Satisfaction",  value: avgSat,             color: "cyan" },
-          { icon: Target,   label: "Avg Response Rate", value: `${avgResp}%`,      color: "blue" },
+          { icon: Users,    label: "Total Faculty",     value: total,       color: "blue" },
+          { icon: Activity, label: "Active Now",         value: activeCount, color: "indigo" },
+          { icon: Star,     label: "Avg Satisfaction",  value: avgSat,      color: "cyan" },
+          { icon: Target,   label: "Avg Response Rate", value: `${avgResp}%`, color: "blue" },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center gap-5">
             <div className={`w-10 h-10 rounded-lg bg-${k.color}-50 text-${k.color}-600 flex items-center justify-center shrink-0`}>
@@ -139,11 +142,25 @@ export default function FacultyPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center">
-                    <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                  </td>
-                </tr>
+                // Skeleton rows — mirrors: avatar | subject | accepted/declined | stars | rate bar | status
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-gray-50 animate-pulse">
+                    <td className="px-6 py-3">
+                      <div className="flex items-center gap-5">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 shrink-0" />
+                        <div className="space-y-1.5">
+                          <div className="h-3.5 w-28 bg-gray-200 rounded" />
+                          <div className="h-3 w-14 bg-gray-100 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3"><div className="h-5 w-20 bg-indigo-100 rounded" /></td>
+                    <td className="px-6 py-3"><div className="h-4 w-16 bg-gray-200 rounded" /></td>
+                    <td className="px-6 py-3"><div className="h-4 w-20 bg-amber-100 rounded" /></td>
+                    <td className="px-6 py-3"><div className="h-2 w-28 bg-gray-200 rounded-full" /></td>
+                    <td className="px-6 py-3"><div className="h-5 w-16 bg-gray-100 rounded-full" /></td>
+                  </tr>
+                ))
               ) : faculty.length > 0 ? faculty.map((f) => (
                 <tr
                   key={f.id}
@@ -205,8 +222,10 @@ export default function FacultyPage() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-sm text-gray-400">
-                    No faculty members found.
+                  <td colSpan={6} className="py-14 text-center">
+                    <UserX className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                    <p className="text-sm font-medium text-gray-400">No faculty members found.</p>
+                    <p className="text-xs text-gray-300 mt-1">Try adjusting your search.</p>
                   </td>
                 </tr>
               )}

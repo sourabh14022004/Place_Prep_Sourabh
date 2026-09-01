@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLeaderboard } from "@/lib/hooks";
 import type { LeaderboardEntry } from "@/lib/types";
-import { Trophy, Star, Zap } from "lucide-react";
+import { Trophy, Zap } from "lucide-react";
 
 const BATCHES = ["All", "2023", "2024", "2025", "2026"];
 const PERIODS = ["All Time", "This Month", "This Week"];
@@ -148,8 +148,7 @@ export default function LeaderboardPage() {
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-[10px] text-gray-400">
-        <div className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> XP = Experience Points earned from tasks, practice & sessions</div>
-        <div className="flex items-center gap-1"><Star className="w-3 h-3 text-blue-400" /> Data refreshes with backend — currently using mock data</div>
+        <div className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> XP = Experience Points earned from tasks, practice &amp; sessions</div>
       </div>
     </div>
   );

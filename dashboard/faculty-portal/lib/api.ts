@@ -1,65 +1,208 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5050/api";
-
 /**
- * Fetch Faculty Profile from MongoDB Atlas
+ * dashboard/faculty-portal/lib/api.ts
+ * Thin fetch client — all faculty portal API calls live here.
  */
-export async function fetchFacultyProfile(clerkUserId?: string, email?: string): Promise<any> {
-  try {
-    const params = new URLSearchParams();
-    if (clerkUserId) params.append("clerkUserId", clerkUserId);
-    if (email) params.append("email", email);
 
-    const res = await fetch(`${API_BASE_URL}/faculty/profile?${params.toString()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const json = await res.json();
-    return json.data || null;
-  } catch (error) {
-    console.warn("Failed to fetch faculty profile from backend:", error);
-    return null;
+// ─── Generic helper ──────────────────────────────────────────────
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.error?.message ?? `API error ${res.status}`);
   }
+  return json.data as T;
 }
 
-/**
- * Update Faculty Profile in MongoDB Atlas
- */
-export async function updateFacultyProfile(data: {
-  clerkUserId?: string;
-  email?: string;
-  name?: string;
-  title?: string;
-  experience?: string;
-  campus?: string;
-  department?: string;
-  employeeId?: string;
-  joined?: string;
-  expertises?: string[];
-  officeHours?: any;
-}): Promise<any> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/faculty/profile`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    return await res.json();
-  } catch (error) {
-    console.warn("Failed to update faculty profile:", error);
-    return { success: false };
-  }
+// ─── Types ───────────────────────────────────────────────────────
+export interface FacultyDashboardData {
+  faculty: {
+    fullName: string;
+    initials: string;
+    subject: string;
+    stream: string;
+    status: string;
+    acceptCount: number;
+    declineCount: number;
+  };
+  stats: {
+    pendingSessions: number;
+    confirmedSessions: number;
+    totalDoubts: number;
+    unansweredDoubts: number;
+    studentsAssigned: number;
+    avgResponseTimeHours: number;
+  };
+  upcomingSessions: SessionData[];
+  pendingDoubts: DoubtData[];
 }
 
+export interface SessionData {
+  _id: string;
+  studentId: { fullName: string; batch: string; branch: string } | string;
+  topic: string;
+  scheduledAt: string;
+  durationMins: number;
+  status: "pending" | "confirmed" | "declined" | "completed";
+  proposedAlternativeAt?: string;
+  meetLink?: string;
+  notes?: string;
+}
+
+export interface DoubtData {
+  _id: string;
+  studentId: { fullName: string; batch: string } | string;
+  studentName: string;
+  subject: string;
+  body: string;
+  tag: string;
+  status: "pending" | "answered" | "closed";
+  createdAt: string;
+  replies: Array<{
+    authorName: string;
+    authorRole: string;
+    body: string;
+    sentAt: string;
+  }>;
+}
+
+export interface StudentMatrixEntry {
+  studentId: string;
+  fullName: string;
+  branch: string;
+  year: string;
+  xpTotal: number;
+  currentStreakDays: number;
+  totalSolved: number;
+  placementStatus: string;
+  targetCompanySlugs: string[];
+  lastActiveAt?: string;
+  rankChange?: number | string;
+  subjectBreakdown?: { dsa: number; sysdesign: number; webdev: number; dbms: number; cloud: number };
+  recentMocks?: any[];
+}
+
+export interface NotificationData {
+  _id: string;
+  type: string;
+  title: string;
+  subtitle?: string;
+  iconName?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface FacultyProfile {
+  userId: string;
+  fullName: string;
+  initials: string;
+  subject: string;
+  stream: string;
+  bio?: string;
+  status: string;
+  acceptCount: number;
+  declineCount: number;
+}
+
+// ─── Auth ────────────────────────────────────────────────────────
+export async function getCurrentUser() {
+  return apiFetch<{ userId: string; role: string; name: string; email: string }>("/api/auth/me");
+}
+
+export async function logout() {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+}
+
+// ─── Dashboard ───────────────────────────────────────────────────
+export async function getDashboard(): Promise<FacultyDashboardData> {
+  return apiFetch<FacultyDashboardData>("/api/faculty/dashboard");
+}
+
+// ─── Profile ─────────────────────────────────────────────────────
+export async function getProfile(): Promise<FacultyProfile> {
+  return apiFetch<FacultyProfile>("/api/faculty/profile");
+}
+
+export async function updateProfile(body: Partial<FacultyProfile>) {
+  return apiFetch<FacultyProfile>("/api/faculty/profile", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+// ─── Sessions ────────────────────────────────────────────────────
+export async function getSessions(status?: string): Promise<{ sessions: SessionData[]; total: number }> {
+  const q = status ? `?status=${status}` : "";
+  return apiFetch<{ sessions: SessionData[]; total: number }>(`/api/faculty/sessions${q}`);
+}
+
+export async function confirmSession(id: string, meetLink?: string) {
+  return apiFetch<SessionData>(`/api/faculty/sessions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "confirm", meetLink }),
+  });
+}
+
+export async function declineSession(id: string, reason?: string) {
+  return apiFetch<SessionData>(`/api/faculty/sessions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "decline", reason }),
+  });
+}
+
+export async function proposeAlternative(id: string, proposedDate: string, proposedTime: string) {
+  return apiFetch<SessionData>(`/api/faculty/sessions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "propose", proposedDate, proposedTime }),
+  });
+}
+
+// ─── Doubts ──────────────────────────────────────────────────────
 /**
- * Fetch All Faculty Members
+ * GET /api/faculty/doubts
+ *
+ * The route replies with successResponse(threads) where threads is a bare
+ * array, and apiFetch already unwraps `json.data`. This used to be typed as
+ * `{ doubts, total }`, so callers destructured `{ doubts }` off an array and
+ * got undefined — the doubt list silently rendered empty. Return the array.
  */
-export async function fetchFacultyList(): Promise<any[]> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/faculty/all`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const json = await res.json();
-    return json.data || [];
-  } catch (error) {
-    console.warn("Failed to fetch faculty list from backend:", error);
-    return [];
-  }
+export async function getDoubts(status?: string): Promise<DoubtData[]> {
+  const q = status ? `?status=${status}` : "";
+  const data = await apiFetch<DoubtData[]>(`/api/faculty/doubts${q}`);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function replyToDoubt(doubtId: string, body: string) {
+  return apiFetch<DoubtData>(`/api/faculty/doubts/${doubtId}/replies`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function resolveDoubt(doubtId: string) {
+  return apiFetch<DoubtData>(`/api/faculty/doubts/${doubtId}/resolve`, {
+    method: "PATCH"
+  });
+}
+
+// ─── Students ────────────────────────────────────────────────────
+export async function getStudents(): Promise<{ students: StudentMatrixEntry[]; total: number }> {
+  return apiFetch<{ students: StudentMatrixEntry[]; total: number }>("/api/faculty/students");
+}
+
+// ─── Notifications ───────────────────────────────────────────────
+export async function getNotifications(): Promise<NotificationData[]> {
+  const res = await apiFetch<{ notifications: NotificationData[]; unreadCount: number }>("/api/faculty/notifications");
+  return res.notifications;
+}
+
+export async function markNotificationRead(id: string) {
+  return apiFetch<void>(`/api/faculty/notifications/${id}`, { method: "PATCH" });
+}
+
+export async function markAllNotificationsRead() {
+  return apiFetch<void>("/api/faculty/notifications/read-all", { method: "POST" });
 }

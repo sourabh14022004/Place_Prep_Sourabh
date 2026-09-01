@@ -1,9 +1,14 @@
 "use client";
-import { useState } from "react";
+import { FeatureGate } from "@/lib/features";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle,
   Video, ChevronLeft, ChevronRight, X, Send, User,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useSessions, updateSessionStatus } from "@/lib/hooks"; // BUG-FIX C1: use SWR hook
+import ErrorState from "@/components/ErrorState";
+import { usePageTitle } from "@/lib/use-page-title";
 
 type SessionStatus = "pending" | "confirmed" | "proposed" | "completed" | "cancelled";
 
@@ -13,7 +18,7 @@ interface Session {
   notes: string;
   date: string;
   time: string;
-  duration: 30 | 60;
+  duration: number; // BUG-FIX C2: was 30 | 60 — now any valid integer 15–120
   status: SessionStatus;
   facultyName: string;
   meetLink?: string;
@@ -21,31 +26,7 @@ interface Session {
   proposedTime?: string;
 }
 
-const TIME_SLOTS = ["9:00 AM", "10:00 AM", "11:00 AM", "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM"];
-
-const mockSessions: Session[] = [
-  {
-    id: "s1", topic: "System Design Mock Interview",
-    notes: "Want to practice designing a URL shortener end-to-end",
-    date: "2026-06-26", time: "10:00 AM", duration: 60,
-    status: "confirmed", facultyName: "Prof. Sharma",
-    meetLink: "https://meet.jit.si/NST-PlacePrep-s1-x7k2m",
-  },
-  {
-    id: "s2", topic: "DSA Doubt Clearing",
-    notes: "Two-pointer and sliding window patterns",
-    date: "2026-06-28", time: "3:00 PM", duration: 30,
-    status: "proposed", facultyName: "Prof. Sharma",
-    proposedDate: "2026-06-29", proposedTime: "4:00 PM",
-  },
-  {
-    id: "s3", topic: "HR Round Preparation",
-    notes: "STAR method practice for Amazon Leadership Principles",
-    date: "2026-06-20", time: "11:00 AM", duration: 60,
-    status: "completed", facultyName: "Prof. Sharma",
-    meetLink: "https://meet.jit.si/NST-PlacePrep-s3-a8b2c",
-  },
-];
+interface FacultyOption { id: string; name: string; subject: string; }
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -63,6 +44,18 @@ function daysUntil(dateStr: string) {
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
   return `In ${diff} days`;
+}
+
+// helper: normalize any time string to HH:mm
+function to24h(t: string): string {
+  if (/^\d{2}:\d{2}$/.test(t)) return t; // already HH:mm (native time input emits this)
+  const m = t.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
+  if (!m) return "09:00";
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  if (m[3].toUpperCase() === "PM" && h !== 12) h += 12;
+  if (m[3].toUpperCase() === "AM" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${min}`;
 }
 
 const STATUS_CFG: Record<SessionStatus, { label: string; cls: string; icon: React.ElementType }> = {
@@ -88,7 +81,6 @@ function MiniCalendar({ onSelect, selected }: { onSelect: (d: string) => void; s
 
   const isAvail = (day: number) => {
     const d = new Date(viewYear, viewMonth, day);
-    // All future dates (including today) are bookable — no day-of-week restriction
     return d >= today;
   };
 
@@ -97,25 +89,22 @@ function MiniCalendar({ onSelect, selected }: { onSelect: (d: string) => void; s
 
   return (
     <div className="bg-white border border-gray-200 rounded">
-      {/* Month nav */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <button onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded text-gray-400">
+        <button onClick={prevMonth} className="p-1 hover:bg-gray-100:bg-slate-800 rounded text-gray-400">
           <ChevronLeft className="w-4 h-4" />
         </button>
         <span className="text-sm font-semibold text-gray-800">{MONTHS[viewMonth]} {viewYear}</span>
-        <button onClick={nextMonth} className="p-1 hover:bg-gray-100 rounded text-gray-400">
+        <button onClick={nextMonth} className="p-1 hover:bg-gray-100:bg-slate-800 rounded text-gray-400">
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Day headers */}
       <div className="grid grid-cols-7 px-3 pt-2">
         {DAYS.map((d) => (
           <div key={d} className="text-center text-[10px] font-semibold text-gray-400 py-1">{d}</div>
         ))}
       </div>
 
-      {/* Date grid */}
       <div className="grid grid-cols-7 gap-0.5 px-3 pb-3">
         {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
@@ -140,7 +129,6 @@ function MiniCalendar({ onSelect, selected }: { onSelect: (d: string) => void; s
         })}
       </div>
 
-      {/* Legend */}
       <div className="flex items-center gap-4 px-4 py-2.5 border-t border-gray-100 text-[10px] text-gray-400">
         <span className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-sm bg-blue-50 border border-blue-200 inline-block" />
@@ -156,20 +144,52 @@ function MiniCalendar({ onSelect, selected }: { onSelect: (d: string) => void; s
 }
 
 // ── Booking Drawer ────────────────────────────────────
+// BUG-FIX C2: onBook duration changed from 30 | 60 to number
 function BookingDrawer({ selectedDate, onClose, onBook }: {
   selectedDate: string;
   onClose: () => void;
-  onBook: (s: Omit<Session, "id" | "status" | "facultyName" | "meetLink">) => void;
+  onBook: (data: { topic: string; notes: string; date: string; time: string; duration: number; facultyId: string; facultyName: string }) => void;
 }) {
-  const [time, setTime] = useState(TIME_SLOTS[0]);
+  const [time, setTime] = useState("09:00"); // BUG-FIX C2: default for native time input
   const [topic, setTopic] = useState("");
   const [notes, setNotes] = useState("");
-  const [duration, setDuration] = useState<30 | 60>(30);
-  const canBook = topic.trim().length > 3;
+  const [duration, setDuration] = useState<number>(30); // BUG-FIX C2: number not 30 | 60
+  const [facultyList, setFacultyList] = useState<FacultyOption[]>([]);
+  const [facultyId, setFacultyId] = useState("");
+  const [facultyError, setFacultyError] = useState(false);
+  const [facultyLoading, setFacultyLoading] = useState(true);
+
+  const loadFaculty = useCallback(() => {
+    setFacultyLoading(true);
+    setFacultyError(false);
+    fetch("/api/messages/faculty", { credentials: "include" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`API ${r.status}`);
+        return r.json();
+      })
+      .then((json) => {
+        const list: FacultyOption[] = (json?.data?.faculty ?? []).map((f: any) => ({
+          id: f.id,
+          name: f.name,
+          subject: f.subject ?? "Faculty",
+        }));
+        setFacultyList(list);
+        setFacultyId((prev) => prev || (list.length > 0 ? list[0].id : ""));
+      })
+      .catch(() => setFacultyError(true))
+      .finally(() => setFacultyLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadFaculty();
+  }, [loadFaculty]);
+
+  // BUG-FIX C2: canBook includes duration range validation
+  const canBook = topic.trim().length >= 5 && facultyId.length > 0 && duration >= 15 && duration <= 120;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded w-full max-w-md shadow-xl overflow-y-auto max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-sm font-bold text-gray-900">Book a Session</h2>
@@ -179,41 +199,64 @@ function BookingDrawer({ selectedDate, onClose, onBook }: {
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* Time slots */}
+          {/* Faculty selector */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Time Slot</label>
-            <div className="grid grid-cols-4 gap-1.5">
-              {TIME_SLOTS.map((t) => (
-                <button key={t} onClick={() => setTime(t)}
-                  className={`py-1.5 rounded text-xs font-semibold border ${
-                    time === t
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-400"
-                  }`}
-                >{t}</button>
-              ))}
-            </div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Select Faculty *</label>
+            {facultyError ? (
+              <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2 flex items-center justify-between gap-2">
+                <span>Couldn&apos;t load faculty list.</span>
+                <button onClick={loadFaculty} className="font-semibold underline shrink-0">Retry</button>
+              </div>
+            ) : facultyLoading ? (
+              <p className="text-xs text-gray-400 bg-gray-50 border border-gray-200 rounded px-3 py-2">
+                Loading faculty list...
+              </p>
+            ) : (
+              <select
+                value={facultyId}
+                onChange={(e) => setFacultyId(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {facultyList.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name} — {f.subject}</option>
+                ))}
+              </select>
+            )}
           </div>
 
-          {/* Duration */}
+          {/* BUG-FIX C2: native time input replaces fixed TIME_SLOTS grid */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">Duration</label>
-            <div className="flex gap-2">
-              {([30, 60] as const).map((d) => (
-                <button key={d} onClick={() => setDuration(d)}
-                  className={`flex-1 py-1.5 rounded text-sm font-semibold border ${
-                    duration === d
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-blue-400"
-                  }`}
-                >{d} min</button>
-              ))}
-            </div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Time</label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* BUG-FIX C2: numeric duration input replaces 30/60 min toggle */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+              Duration (minutes) <span className="font-normal text-gray-400 normal-case">15–120</span>
+            </label>
+            <input
+              type="number"
+              min={15}
+              max={120}
+              step={5}
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {(duration < 15 || duration > 120) && (
+              <p className="text-[11px] text-red-500 mt-1">Duration must be between 15 and 120 minutes</p>
+            )}
           </div>
 
           {/* Topic */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Session Topic</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Session Topic *</label>
             <input
               type="text"
               value={topic}
@@ -221,6 +264,9 @@ function BookingDrawer({ selectedDate, onClose, onBook }: {
               placeholder="e.g. System Design Mock, DSA Doubt Clearing..."
               className="w-full text-sm border border-gray-200 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {topic.trim().length > 0 && topic.trim().length < 5 && (
+              <p className="text-[11px] text-red-500 mt-1">Topic must be at least 5 characters</p>
+            )}
           </div>
 
           {/* Notes */}
@@ -238,7 +284,7 @@ function BookingDrawer({ selectedDate, onClose, onBook }: {
           </div>
 
           <p className="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded px-3 py-2">
-            A Jitsi Meet link will be shared once faculty confirms.
+            A meet link will be shared once faculty confirms your request.
           </p>
         </div>
 
@@ -246,7 +292,19 @@ function BookingDrawer({ selectedDate, onClose, onBook }: {
           <button onClick={onClose} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button>
           <button
             disabled={!canBook}
-            onClick={() => { onBook({ topic, notes, date: selectedDate, time, duration }); onClose(); }}
+            onClick={() => {
+              const selectedFaculty = facultyList.find(f => f.id === facultyId);
+              onBook({
+                topic: topic.trim(),
+                notes: notes.trim(),
+                date: selectedDate,
+                time: to24h(time), // native time input already emits HH:mm; to24h is a no-op here
+                duration,
+                facultyId,
+                facultyName: selectedFaculty?.name ?? "Faculty",
+              });
+              onClose();
+            }}
             className={`flex items-center gap-1.5 text-sm font-semibold px-4 py-1.5 rounded ${
               canBook ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
@@ -259,8 +317,8 @@ function BookingDrawer({ selectedDate, onClose, onBook }: {
   );
 }
 
-// ── Session Card ──────────────────────────────────────
-function SessionCard({ session, onAcceptProposal }: { session: Session; onAcceptProposal: (id: string) => void }) {
+// ── Session Card ────────────────────────────────────
+function SessionCard({ session, onAcceptProposal, onDecline }: { session: Session; onAcceptProposal: (id: string) => void; onDecline: (id: string) => void }) {
   const { label, cls, icon: StatusIcon } = STATUS_CFG[session.status];
   const until = daysUntil(session.date);
   const showJoin = session.status === "confirmed" && new Date(session.date) >= new Date();
@@ -312,7 +370,10 @@ function SessionCard({ session, onAcceptProposal }: { session: Session; onAccept
             >
               <CheckCircle2 className="w-3 h-3" /> Accept
             </button>
-            <button className="flex items-center gap-1 text-xs font-medium border border-gray-300 text-gray-500 px-3 py-1.5 rounded hover:bg-gray-50">
+            <button
+              onClick={() => onDecline(session.id)}
+              className="flex items-center gap-1 text-xs font-medium border border-gray-300 text-gray-500 px-3 py-1.5 rounded hover:bg-gray-50:bg-slate-800/60 hover:border-red-300 hover:text-red-500 transition-colors"
+            >
               <XCircle className="w-3 h-3" /> Decline
             </button>
           </div>
@@ -322,24 +383,147 @@ function SessionCard({ session, onAcceptProposal }: { session: Session; onAccept
   );
 }
 
-export default function SessionsPage() {
-  const [sessions, setSessions] = useState<Session[]>(mockSessions);
+function SessionsPageInner() {
+  usePageTitle("Sessions");
+  // BUG-FIX C1: removed useState<Session[]> and manual useEffect fetch
+  const [pendingSession, setPendingSession] = useState<Session | null>(null); // optimistic-only
   const [selectedDate, setSelectedDate] = useState("");
   const [showBooking, setShowBooking] = useState(false);
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
-  const handleBook = (data: Omit<Session, "id" | "status" | "facultyName" | "meetLink">) =>
-    setSessions((prev) => [{ ...data, id: `s${Date.now()}`, status: "pending", facultyName: "Prof. Sharma" }, ...prev]);
+  // BUG-FIX C1: use SWR hook — revalidateOnFocus + refreshInterval:15s (set in hooks.ts)
+  const { data: rawSessionsData, isLoading, error: sessionsError, mutate: mutateSessions } = useSessions();
 
-  const handleAcceptProposal = (id: string) =>
-    setSessions((prev) => prev.map((s) => s.id === id ? {
-      ...s, status: "confirmed",
-      date: s.proposedDate ?? s.date, time: s.proposedTime ?? s.time,
-      meetLink: `https://meet.jit.si/NST-PlacePrep-${id}-${Math.random().toString(36).slice(2, 6)}`,
-    } : s));
+  // BUG-FIX C1: derive sessions from SWR data via useMemo
+  const sessions = useMemo<Session[]>(() => {
+    const arr = Array.isArray(rawSessionsData) ? rawSessionsData : [];
+    return arr.map((s: any) => ({
+      id: s._id ?? s.id,
+      topic: s.topic,
+      notes: s.notes ?? "",
+      date: s.requestedDate ?? s.scheduledAt?.split("T")[0] ?? "",
+      time: s.requestedTime ?? (s.scheduledAt
+        ? new Date(s.scheduledAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+        : ""),
+      duration: s.durationMin ?? s.durationMins ?? 30, // BUG-FIX C2: number
+      status: (s.status === "declined" ? "cancelled" : s.status) as SessionStatus,
+      // FIX: facultyName is denormalized on every SessionBooking doc — the old
+      // code only read the populated object path, so cards ALWAYS said "Faculty".
+      facultyName: typeof s.facultyId === "object" && s.facultyId !== null
+        ? s.facultyId?.fullName ?? s.facultyName ?? "Faculty"
+        : s.facultyName ?? "Faculty",
+      meetLink: s.meetLink,
+      proposedDate: s.proposedDate ?? s.proposedAlternativeAt?.split("T")[0],
+      proposedTime: s.proposedTime ?? (s.proposedAlternativeAt
+        ? new Date(s.proposedAlternativeAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+        : undefined),
+    }));
+  }, [rawSessionsData]);
 
-  const upcoming = sessions.filter((s) => ["pending", "confirmed", "proposed"].includes(s.status));
-  const past = sessions.filter((s) => ["completed", "cancelled"].includes(s.status));
+  // Merge optimistic pending session with SWR sessions (for instant post-booking UX)
+  const displayedSessions = useMemo(() =>
+    pendingSession
+      ? [pendingSession, ...sessions.filter(s => s.id !== pendingSession.id)]
+      : sessions,
+    [sessions, pendingSession]
+  );
+
+  // BUG-FIX C1+C2: duration is now number; after API call mutate SWR instead of patching local state
+  const handleBook = async (data: { topic: string; notes: string; date: string; time: string; duration: number; facultyId: string; facultyName: string }) => {
+    const optimisticId = `s${Date.now()}`;
+    setPendingSession({
+      id: optimisticId,
+      topic: data.topic,
+      notes: data.notes,
+      date: data.date,
+      time: data.time,
+      duration: data.duration,
+      status: "pending",
+      facultyName: data.facultyName,
+    });
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          facultyId: data.facultyId,
+          topic: data.topic,
+          notes: data.notes || undefined,
+          requestedDate: data.date,
+          requestedTime: data.time,
+          durationMin: data.duration, // BUG-FIX C2: now any integer 15–120
+        }),
+      });
+      if (res.ok) {
+        toast.success("Session request sent! Faculty will confirm shortly.");
+        await mutateSessions(); // BUG-FIX C1: re-fetch from DB via SWR
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        const fieldErrors = errJson?.error?.details;
+        const msg = fieldErrors
+          ? Object.values(fieldErrors).flat().join(" ")
+          : errJson?.error?.message || "Failed to book session.";
+        toast.error(msg);
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setPendingSession(null); // clear optimistic — SWR data now authoritative
+    }
+  };
+
+  // BUG-FIX C1: use SWR mutate after API resolves instead of setSessions
+  const handleAcceptProposal = async (id: string) => {
+    try {
+      await updateSessionStatus(id, 'accept_proposal');
+      toast.success("Session confirmed! Faculty will share the meet link.");
+      await mutateSessions(); // BUG-FIX C1: SWR re-fetch updates the card state
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to confirm session.");
+      await mutateSessions(); // revert to actual DB state on error
+    }
+  };
+
+  // BUG-FIX C1: use SWR mutate after API resolves instead of setSessions
+  const handleDeclineProposal = async (id: string) => {
+    try {
+      await updateSessionStatus(id, 'cancel');
+      toast.success("Proposal declined.");
+      await mutateSessions(); // BUG-FIX C1: SWR re-fetch
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to decline proposal.");
+      await mutateSessions();
+    }
+  };
+
+  const upcoming = displayedSessions.filter((s) => ["pending", "confirmed", "proposed"].includes(s.status));
+  const past = displayedSessions.filter((s) => ["completed", "cancelled"].includes(s.status));
+
+  if (sessionsError) {
+    return <ErrorState error={sessionsError} title="Couldn't load your sessions" onRetry={() => mutateSessions()} />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl animate-pulse">
+        <div className="mb-5">
+          <div className="h-7 bg-gray-100 rounded w-40 mb-2" />
+          <div className="h-4 bg-gray-100 rounded w-64" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] gap-6">
+          <div className="h-72 bg-gray-100 rounded-xl" />
+          <div className="space-y-4">
+            <div className="h-10 bg-gray-100 rounded-lg w-48" />
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-28 bg-gray-100 rounded-xl" />
+            ))}
+          </div>
+          <div className="h-64 bg-gray-100 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl">
@@ -370,7 +554,7 @@ export default function SessionsPage() {
                 <CalendarDays className="w-4 h-4 text-blue-600" /> How it works
               </p>
               <p className="flex items-start gap-2"><span className="font-bold text-blue-300">1.</span> Pick any available date on the calendar</p>
-              <p className="flex items-start gap-2"><span className="font-bold text-blue-300">2.</span> Choose a time slot and session topic</p>
+              <p className="flex items-start gap-2"><span className="font-bold text-blue-300">2.</span> Choose a time and session topic</p>
               <p className="flex items-start gap-2"><span className="font-bold text-blue-300">3.</span> Faculty confirms or proposes a new time</p>
               <p className="flex items-start gap-2"><span className="font-bold text-blue-300">4.</span> Join via the auto-generated Jitsi Meet link</p>
             </div>
@@ -379,11 +563,10 @@ export default function SessionsPage() {
 
         {/* Middle: Sessions List */}
         <div>
-          {/* Tab switcher */}
           <div className="flex items-center gap-0 border border-gray-200 rounded-lg overflow-hidden mb-5 w-fit bg-white shadow-sm p-1">
             {(["upcoming", "past"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
-                className={`px-5 py-1.5 text-xs font-bold capitalize rounded-md transition-colors ${
+                className={`px-5 py-1.5 text-xs font-bold capitalize rounded-xl transition-colors ${
                   tab === t ? "bg-gray-900 text-white shadow" : "text-gray-500 hover:text-gray-900"
                 }`}
               >
@@ -402,7 +585,7 @@ export default function SessionsPage() {
               </div>
             ) : (
               (tab === "upcoming" ? upcoming : past).map((s) => (
-                <SessionCard key={s.id} session={s} onAcceptProposal={handleAcceptProposal} />
+                <SessionCard key={s.id} session={s} onAcceptProposal={handleAcceptProposal} onDecline={handleDeclineProposal} />
               ))
             )}
           </div>
@@ -411,12 +594,11 @@ export default function SessionsPage() {
         {/* Right: Info Card */}
         <div>
           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-4 text-white shadow-md relative overflow-hidden">
-            {/* Background decorations */}
-            <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-white/10 blur-xl"></div>
-            
+            <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full bg-white blur-xl"></div>
+
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-sm border border-white/10 shrink-0">
+                <div className="bg-white w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-sm border border-white/10 shrink-0">
                   <User className="w-4 h-4 text-white" />
                 </div>
                 <div>
@@ -424,20 +606,20 @@ export default function SessionsPage() {
                   <p className="text-blue-100 text-[10px]">Book a 1:1 mentor session</p>
                 </div>
               </div>
-              
+
               <ul className="space-y-1.5 mb-4">
                 <li className="flex items-center gap-2 text-[11px] font-medium text-white/90">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-200 shrink-0" /> Resume Review & Polish
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-200 shrink-0" /> Resume Review &amp; Polish
                 </li>
                 <li className="flex items-center gap-2 text-[11px] font-medium text-white/90">
                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-200 shrink-0" /> Mock Interviews (DSA/HR)
                 </li>
                 <li className="flex items-center gap-2 text-[11px] font-medium text-white/90">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-200 shrink-0" /> System Design & LLD
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-200 shrink-0" /> System Design &amp; LLD
                 </li>
               </ul>
-              
-              <div className="bg-white/10 rounded-lg p-2.5 backdrop-blur-sm border border-white/10 text-[9px] leading-tight text-blue-50">
+
+              <div className="bg-white rounded-lg p-2.5 backdrop-blur-sm border border-white/10 text-[9px] leading-tight text-blue-50">
                 Sessions are subject to faculty availability. Please book at least 24 hours in advance.
               </div>
             </div>
@@ -449,5 +631,14 @@ export default function SessionsPage() {
         <BookingDrawer selectedDate={selectedDate} onClose={() => setShowBooking(false)} onBook={handleBook} />
       )}
     </div>
+  );
+}
+
+// Admin feature-toggle gate (Feature Controls → student.sessions)
+export default function SessionsPageGate() {
+  return (
+    <FeatureGate feature="student.sessions" title="Session Booking">
+      <SessionsPageInner  />
+    </FeatureGate>
   );
 }

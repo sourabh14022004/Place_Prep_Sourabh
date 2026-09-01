@@ -1,16 +1,33 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Toaster } from "sonner";
 import "./globals.css";
 import { FacultyProvider } from "@/lib/context/FacultyContext";
-import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
-  title: "PlacePrep - Faculty Portal",
-  description: "NST PlacePrep Faculty Portal — Curriculum intelligence and session management.",
+  title: {
+    default: "PlacePrep — Faculty Portal",
+    template: "%s · PlacePrep Faculty",
+  },
+  description:
+    "NST PlacePrep Faculty Portal — mentor students through doubts, sessions and curriculum intelligence.",
+  applicationName: "PlacePrep Faculty",
+  // Internal authed app — never index
+  robots: { index: false, follow: false, nocache: true },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/apple-icon",
+  },
 };
 
-const AUTH_PORTAL_URL =
-  process.env.NEXT_PUBLIC_AUTH_PORTAL_URL || "https://place-prep-sourabh-mocha.vercel.app";
-const IS_SATELLITE = process.env.NEXT_PUBLIC_CLERK_IS_SATELLITE === "true";
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#312e81",
+  colorScheme: "light",
+};
 
 export default function RootLayout({
   children,
@@ -20,15 +37,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-gray-50 text-gray-900 h-full" suppressHydrationWarning>
-        <ClerkProvider
-          isSatellite={IS_SATELLITE}
-          signInUrl={IS_SATELLITE ? `${AUTH_PORTAL_URL}/login` : undefined}
-          afterSignOutUrl={IS_SATELLITE ? `${AUTH_PORTAL_URL}/login` : "/login"}
-        >
-          <FacultyProvider>
-            {children}
-          </FacultyProvider>
-        </ClerkProvider>
+        <FacultyProvider>
+          <Toaster position="top-right" richColors closeButton />
+          {children}
+        </FacultyProvider>
       </body>
     </html>
   );

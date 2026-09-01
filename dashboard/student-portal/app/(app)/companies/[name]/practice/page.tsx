@@ -1,16 +1,12 @@
 "use client";
-import { useState, useEffect, useMemo, use } from "react";
+import { CompanyLogo } from "@/components/ui";
+import { FeatureGate } from "@/lib/features";
+import { useState, useMemo, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, Search, X, SearchX, Flame } from "lucide-react";
-import {
-  filterQuestions,
-  allTopics,
-  getCompanyIntel,
-  getUserRoadmapCompanies,
-  type Difficulty,
-  type RoundType,
-} from "@/lib/mock-data";
-import CompanyLogo from "@/components/ui/CompanyLogo";
+import { useCompany, usePractice, useRoadmap } from "@/lib/hooks";
+import { allTopics, type Difficulty, type RoundType, getPracticeUrl, getPlatformInfo } from "@/lib/constants";
+import ErrorState from "@/components/ErrorState";
 
 const diffBadge = (d: string) =>
   d === "Easy"   ? "bg-green-50 text-green-700 border border-green-200" :
@@ -26,7 +22,7 @@ const roundColors: Record<string, string> = {
   "Domain":        "bg-gray-100 text-gray-700",
 };
 
-export default function CompanyPracticePage({
+function CompanyPracticePageInner({
   params,
   searchParams,
 }: {
@@ -35,72 +31,66 @@ export default function CompanyPracticePage({
 }) {
   const { name: slug } = use(params);
   const resolvedSearchParams = use(searchParams);
-  const intel = getCompanyIntel(slug);
-  const activeRoadmap = getUserRoadmapCompanies().find((r) => r.slug === slug);
-
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadBackendQuestions() {
-      setLoading(true);
-      try {
-        const res = await fetch(`http://localhost:5050/api/questions?companySlug=${slug}&limit=100`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json && Array.isArray(json.data) && json.data.length > 0) {
-            setQuestions(json.data);
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to fetch questions from backend:", err);
-      }
-      setQuestions(filterQuestions({ company: slug }));
-      setLoading(false);
-    }
-    loadBackendQuestions();
-  }, [slug]);
+  
+  const { data: companyRes, error: companyError, mutate: retryCompany } = useCompany(slug);
+  const intel = companyRes?.data ?? companyRes;
+  
+  const { data: roadmapRes } = useRoadmap();
+  const roadmaps = roadmapRes?.data?.roadmaps ?? roadmapRes?.roadmaps ?? [];
+  const activeRoadmap = roadmaps.find((r: any) => r.companySlug === slug);
 
   const [search, setSearch] = useState("");
   const [topic, setTopic] = useState(
     typeof resolvedSearchParams.topic === "string" ? resolvedSearchParams.topic : ""
   );
   const [difficulty, setDifficulty] = useState<Difficulty | "">("");
-  const [roundType, setRoundType] = useState<RoundType | "">("");
+  const [roundType, setRoundType] = useState<RoundType | "">("Coding");
   const [weekFilter, setWeekFilter] = useState<number | "">("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 100;
+
+  // Reset page to 1 when any filter changes
+  const handleTopicChange = (val: string) => { setTopic(val); setPage(1); };
+  const handleDifficultyChange = (val: Difficulty | "") => { setDifficulty(val); setPage(1); };
+  const handleRoundTypeChange = (val: RoundType | "") => { setRoundType(val); setPage(1); };
+  const handleSearchChange = (val: string) => { setSearch(val); setPage(1); };
+
+  // Fetch current page from API — server-side filters
+  const { data: practiceRes, isLoading: questionsLoading, error: questionsError, mutate: retryQuestions } = usePractice({
+    company: slug,
+    topic,
+    difficulty,
+    roundType: roundType || undefined,
+    page,
+    limit: PAGE_SIZE,
+  });
+
+  const rawQuestions = (practiceRes?.data ?? []) as any[];
+  const hasNextPage = page < (practiceRes?.meta?.totalPages ?? 1);
+  const hasPrevPage = page > 1;
+
+
 
   const filtered = useMemo(() => {
-    let list = questions;
-
-    if (search) {
+    let list = [...rawQuestions];
+    // roundType is already filtered server-side; only apply search + weekFilter locally
+    if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((item) => item.title?.toLowerCase().includes(q) || item.problemSummary?.toLowerCase().includes(q));
+      list = list.filter((item) => item.title?.toLowerCase().includes(q));
     }
-    if (topic && topic !== "All") {
-      list = list.filter((item) => {
-        const itemTopic = Array.isArray(item.topics) ? item.topics.join(" ") : (item.topic || "");
-        return itemTopic.toLowerCase().includes(topic.toLowerCase());
-      });
-    }
-    if (difficulty && difficulty !== "All") {
-      list = list.filter((item) => (item.difficulty || item.diff || "").toLowerCase() === difficulty.toLowerCase());
-    }
-    if (roundType && roundType !== "All") {
-      list = list.filter((item) => (item.roundType || "").toLowerCase().includes(roundType.toLowerCase()));
-    }
-
     if (weekFilter !== "" && activeRoadmap) {
-      const selectedWeek = activeRoadmap.weeks.find((w) => w.weekNumber === Number(weekFilter));
+      const selectedWeek = activeRoadmap.weeks.find((w: any) => w.weekNumber === Number(weekFilter));
       if (selectedWeek) {
-        const weekQIds = new Set(selectedWeek.questions.map((q) => q.id));
-        list = list.filter((q) => weekQIds.has(q.id || q._id));
+        const weekQIds = new Set(
+          selectedWeek.tasks?.map((t: any) =>
+            typeof t.questionId === "object" ? t.questionId._id : t.questionId
+          )
+        );
+        list = list.filter((item) => weekQIds.has(item._id));
       }
     }
-
     return list;
-  }, [questions, topic, difficulty, roundType, search, weekFilter, activeRoadmap]);
+  }, [rawQuestions, roundType, search, weekFilter, activeRoadmap]);
 
   const companyBg =
     slug === "google"    ? "bg-blue-600"   :
@@ -110,7 +100,21 @@ export default function CompanyPracticePage({
     slug === "razorpay"  ? "bg-blue-800"   :
     slug === "tcs"       ? "bg-indigo-600" : "bg-blue-600";
 
-  const initial = intel.name[0].toUpperCase();
+  // ERROR FIX: failed fetches previously rendered the same "No questions match"
+  // message as a genuine empty result — indistinguishable and unrecoverable.
+  // NOTE: deliberately placed AFTER every hook so render order stays stable.
+  if (questionsError) {
+    return (
+      <div className="max-w-5xl">
+        <ErrorState
+          error={questionsError}
+          title="Couldn't load questions for this company"
+          onRetry={() => { retryQuestions(); retryCompany(); }}
+        />
+      </div>
+    );
+  }
+
 
   return (
     <div>
@@ -118,32 +122,28 @@ export default function CompanyPracticePage({
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-5">
         <Link href="/companies" className="hover:text-gray-700 transition-colors">Companies</Link>
         <span>/</span>
-        <Link href={`/companies/${slug}`} className="hover:text-gray-700 transition-colors capitalize">{intel.name}</Link>
+        <Link href={`/companies/${slug}`} className="hover:text-gray-700 transition-colors capitalize">{intel?.name || slug}</Link>
         <span>/</span>
         <span className="text-gray-900 font-medium">Practice</span>
       </div>
 
       {/* Company header banner */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 flex items-center gap-4">
-        <CompanyLogo
-          slug={slug}
-          name={intel?.name || slug}
-          className="w-12 h-12 rounded-xl"
-        />
+<CompanyLogo name={slug} size={32} />
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-0.5">
-            <h1 className="text-lg font-bold text-gray-900">Practice for {intel.name}</h1>
+            <h1 className="text-lg font-bold text-gray-900">Practice for {intel?.name || slug}</h1>
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${companyBg} text-white`}>
               Company-Locked
             </span>
           </div>
           <p className="text-sm text-gray-500">
-            All questions below are from {intel.name} interviews only — {filtered.length} shown
+            All questions below are from {intel?.name || slug} interviews only — {filtered.length} shown
           </p>
         </div>
         <Link
           href={`/companies/${slug}`}
-          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 shrink-0"
+          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50:bg-slate-800/60 shrink-0"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Intel
         </Link>
@@ -158,7 +158,7 @@ export default function CompanyPracticePage({
             type="text"
             placeholder="Search questions..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-8 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
           />
           {search && (
@@ -171,7 +171,7 @@ export default function CompanyPracticePage({
         {/* Topic */}
         <select
           value={topic}
-          onChange={(e) => setTopic(e.target.value)}
+          onChange={(e) => handleTopicChange(e.target.value)}
           className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
         >
           <option value="">All Topics</option>
@@ -181,7 +181,7 @@ export default function CompanyPracticePage({
         {/* Round type (available here since this is company-specific) */}
         <select
           value={roundType}
-          onChange={(e) => setRoundType(e.target.value as RoundType | "")}
+          onChange={(e) => handleRoundTypeChange(e.target.value as RoundType | "")}
           className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
         >
           <option value="">All Rounds</option>
@@ -198,7 +198,7 @@ export default function CompanyPracticePage({
           {(["", "Easy", "Medium", "Hard"] as const).map((d) => (
             <button
               key={d || "all"}
-              onClick={() => setDifficulty(d as Difficulty | "")}
+              onClick={() => handleDifficultyChange(d as Difficulty | "")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 difficulty === d
                   ? d === "Easy"   ? "bg-green-600 text-white" :
@@ -220,7 +220,7 @@ export default function CompanyPracticePage({
             className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-gray-700"
           >
             <option value="">All Weeks</option>
-            {activeRoadmap.weeks.map((w) => (
+            {activeRoadmap.weeks.map((w: any) => (
               <option key={w.weekNumber} value={w.weekNumber}>
                 Week {w.weekNumber}
               </option>
@@ -241,67 +241,95 @@ export default function CompanyPracticePage({
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {filtered.map((q: any, idx: number) => {
-              const title = q.problemSummary || q.title || "Interview Question";
-              const topicStr = Array.isArray(q.topics) && q.topics.length > 0 ? q.topics.join(", ") : (q.topic || "DSA");
-              const diffStr = q.difficulty || q.diff || "Medium";
-              const xpVal = q.xpValue !== undefined ? q.xpValue : (q.xp || 10);
-              const isHotVal = q.isHot !== undefined ? q.isHot : q.hot;
-              const freqPct = q.frequencyScore !== undefined
-                ? Math.round(q.frequencyScore * 100)
-                : (q.frequency || 75);
-              const linkUrl = q.leetcodeUrl || q.sourceUrl;
+            {filtered.map((q, idx) => (
+              <div key={q.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50:bg-slate-800/60 transition-colors">
+                <span className="text-xs text-gray-400 font-mono w-6 shrink-0">{idx + 1}</span>
 
-              return (
-                <div key={q._id || q.id || title || idx} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                  <span className="text-xs text-gray-400 font-mono w-6 shrink-0">{idx + 1}</span>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900 truncate" title={title}>{title}</div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-gray-500">{topicStr}</span>
-                      {isHotVal && <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5"><Flame className="w-3 h-3 mr-1 inline-block" /> Hot</span>}
-                      {freqPct > 0 && (
-                        <span className="text-xs text-gray-400">Asked in {freqPct}% of interviews</span>
-                      )}
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-gray-900 truncate">{q.title}</div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    {q.topic && <span className="text-xs text-gray-500">{q.topic}</span>}
+                    {q.hot && <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5"><Flame className="w-3 h-3 mr-1 inline-block" />Hot</span>}
+                    {q.frequency > 0 && (
+                      <span className="text-xs text-gray-400">Asked in {q.frequency}% of interviews</span>
+                    )}
                   </div>
+                </div>
 
-                  {/* Round badge */}
-                  <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${roundColors[q.roundType] ?? "bg-gray-100 text-gray-700"}`}>
-                    {q.roundType || "Coding"}
-                  </span>
+                {/* Round badge */}
+                <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${roundColors[q.roundType] ?? "bg-gray-100 text-gray-700"}`}>
+                  {q.roundType}
+                </span>
 
-                  {/* Difficulty badge */}
-                  <span className={`text-xs font-semibold rounded-full border px-2.5 py-1 shrink-0 ${diffBadge(diffStr)}`}>
-                    {diffStr}
-                  </span>
+                {/* Difficulty badge */}
+                <span className={`text-xs font-semibold rounded-full border px-2.5 py-1 shrink-0 ${diffBadge(q.diff)}`}>
+                  {q.diff}
+                </span>
 
-                  <span className="text-xs font-bold text-amber-600 shrink-0">+{xpVal} XP</span>
+                <span className="text-xs font-bold text-amber-600 shrink-0">+{q.xp} XP</span>
 
-                  {linkUrl ? (
+                {(() => {
+                  const practiceUrl = getPracticeUrl(q);
+                  return practiceUrl ? (
                     <a
-                      href={linkUrl}
+                      href={practiceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 shrink-0"
-                      aria-label={`Open ${title}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 rounded-lg transition-colors shrink-0 group/link"
+                      title={`Solve on ${getPlatformInfo(practiceUrl).name}`}
+                      aria-label={`Open ${q.title} on ${getPlatformInfo(practiceUrl).name}`}
                     >
-                      <ExternalLink className="w-4 h-4" />
+                      <span>Solve</span>
+                      <ExternalLink className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 transition-transform" />
                     </a>
                   ) : (
                     <div className="w-4 shrink-0" />
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })()}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      <p className="text-xs text-gray-400 text-center mt-4">
-        Showing {filtered.length} questions for {intel.name} · More coming as community contributes
+      {/* Prev / Next page navigation — replaces current 100 with adjacent page's 100 */}
+      {(hasPrevPage || hasNextPage) && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <p className="text-xs text-gray-400">
+            Page {page} &middot; {filtered.length} questions{!hasNextPage ? " · Last page" : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setPage((p) => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={!hasPrevPage || questionsLoading}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50:bg-slate-800/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ArrowLeft className="w-4 h-4" /> Prev
+            </button>
+            <span className="text-sm font-bold text-gray-700 min-w-[2rem] text-center">{page}</span>
+            <button
+              onClick={() => { setPage((p) => p + 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={!hasNextPage || questionsLoading}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50:bg-slate-800/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ArrowLeft className="w-4 h-4 rotate-180" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400 text-center mt-2">
+        {intel?.name || slug} &middot; {roundType || "All rounds"} &middot; {questionsLoading ? "Loading..." : `${filtered.length} on page ${page}`}
       </p>
     </div>
+  );
+}
+
+// Admin feature-toggle gate (Feature Controls → student.practice)
+export default function CompanyPracticePageGate(props: { params: Promise<{ name: string }>; searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  return (
+    <FeatureGate feature="student.practice" title="Practice Zone">
+      <CompanyPracticePageInner {...props} />
+    </FeatureGate>
   );
 }

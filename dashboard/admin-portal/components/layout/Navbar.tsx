@@ -2,51 +2,58 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Bell, HelpCircle } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, X, Bell, Settings, HelpCircle } from "lucide-react";
 import { SidebarContent } from "./Sidebar";
 
+const pageTitles: Record<string, string> = {
+  "/overview": "Overview",
+  "/students": "Students",
+  "/faculty": "Faculty Performance",
+  "/manage-faculty": "Manage Faculty",
+  "/analytics/engagement": "Engagement Analytics",
+  "/analytics/doubts": "Doubts Intelligence",
+  "/analytics/practice": "Practice Analytics",
+  "/analytics/placement": "Placement Tracker",
+  "/leaderboard": "Leaderboard",
+  "/bookings": "Slot Bookings",
+  "/notifications": "Notifications",
+  "/help": "Help",
+};
+
 export default function Navbar() {
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const title = pageTitles[pathname] || "Admin Portal";
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 z-50 gap-2 lg:gap-0">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6 lg:ml-[var(--sidebar-width)]">
         {/* Mobile hamburger */}
         <button
-          className="p-1.5 -ml-1.5 text-gray-600 hover:bg-gray-100 rounded-md lg:hidden"
+          className="lg:hidden p-2 -ml-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
           onClick={() => setMobileMenuOpen(true)}
-          aria-label="Toggle Sidebar"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="h-5 w-5" />
         </button>
 
-        {/* Logo container matching Student Portal style */}
-        <div className="flex items-center gap-2 lg:w-[216px] shrink-0">
-          <img src="/newton-school-logo.png" alt="NST Logo" className="h-7 w-7 object-contain shrink-0" />
-          <span className="font-bold text-gray-900 text-sm hidden sm:inline-block">
-            PlacePrep
-          </span>
-          <span className="text-xs text-gray-900 font-semibold hidden md:inline-block">
-            | Admin
-          </span>
-        </div>
+        {/* Page title */}
+        <h1 className="text-base font-semibold text-gray-900 lg:text-lg">{title}</h1>
 
         {/* Right actions */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1">
           <Link
             href="/notifications"
-            aria-label="Notifications"
-            className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700 shrink-0"
+            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           >
-            <Bell className="w-4.5 h-4.5" />
+            <Bell className="h-5 w-5" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
           </Link>
           <Link
             href="/help"
-            aria-label="Help"
-            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700 shrink-0"
+            className="hidden sm:flex p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           >
-            <HelpCircle className="w-4.5 h-4.5" />
+            <HelpCircle className="h-5 w-5" />
           </Link>
         </div>
       </header>
@@ -56,12 +63,12 @@ export default function Navbar() {
         <div className="fixed inset-0 z-50 lg:hidden">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/30 backdrop-blur-xs"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setMobileMenuOpen(false)}
           />
           {/* Drawer */}
-          <div className="fixed inset-y-0 left-0 w-[216px] bg-white shadow-xl z-50 animate-in slide-in-from-left duration-200">
-            <div className="absolute top-3 right-3 z-10">
+          <div className="fixed inset-y-0 left-0 w-[var(--sidebar-width)] bg-white shadow-xl z-50 animate-in slide-in-from-left duration-200">
+            <div className="absolute top-3 right-3">
               <button
                 className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                 onClick={() => setMobileMenuOpen(false)}

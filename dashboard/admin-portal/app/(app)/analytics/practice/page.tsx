@@ -45,7 +45,8 @@ export default function PracticeZonePage() {
   };
 
   // Build batch × domain data for the table
-  const totalByDomain = data.byDomain.reduce<Record<string, number>>((acc, d) => {
+  const domainData = data.byDomain as { domain: string; questionsSolved: number; uniqueStudents: number }[];
+  const totalByDomain = domainData.reduce((acc: Record<string, number>, d) => {
     acc[d.domain] = d.questionsSolved;
     return acc;
   }, {});
@@ -89,7 +90,7 @@ export default function PracticeZonePage() {
             />
             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
             <Bar dataKey="questionsSolved" name="Questions Solved" radius={[4, 4, 0, 0]} maxBarSize={36}>
-              {data.byDomain.map((entry) => (
+              {(data.byDomain as { domain: string; questionsSolved: number; uniqueStudents: number }[]).map((entry) => (
                 <rect key={entry.domain} fill={DOMAIN_COLORS[entry.domain] || "#2563eb"} />
               ))}
             </Bar>
@@ -128,7 +129,7 @@ export default function PracticeZonePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {data.batchDomainMatrix.map((row) => (
+              {(data.batchDomainMatrix as { batch: string; domains: Record<string, number> }[]).map((row) => (
                 <tr key={row.batch} className="hover:bg-gray-50 transition-colors">
                   <td className="py-2.5 px-3 text-xs font-semibold text-gray-900">Batch {row.batch}</td>
                   {DOMAINS.map((d) => {

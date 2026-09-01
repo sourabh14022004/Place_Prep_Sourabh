@@ -17,6 +17,8 @@ export const mockOverviewStats: OverviewStats = {
   serverLoad: 14,
   // Phase 2
   totalStudents: 428,
+  placedStudents: 292,
+  inProgressStudents: 136,
   totalFaculty: 12,
   activeFaculty: 9,
   inactiveFaculty: 3,
@@ -28,6 +30,7 @@ export const mockOverviewStats: OverviewStats = {
   mauFaculty: 11,
   currentOnlineStudents: 43,
   currentOnlineFaculty: 3,
+  requestsPerMinute: 0,
 };
 
 export const mockWeeklySessions: WeeklySession[] = [

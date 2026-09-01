@@ -1,18 +1,39 @@
 {
-  "name": "place-prep-express-backend",
+  "name": "placeprep-backend",
   "version": "1.0.0",
-  "description": "Express.js REST API Backend for Place Prep Portal connected to MongoDB Atlas",
-  "main": "src/server.js",
-  "type": "commonjs",
+  "description": "PlacePrep NST Interview Intelligence Portal \u2014 Node.js Backend Service Layer",
+  "private": true,
+  "main": "src/index.ts",
+  "exports": {
+    "./*": "./*"
+  },
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "ts-node --project tsconfig.json src/scripts/seed.ts",
+    "seed:reset": "ts-node --project tsconfig.json src/scripts/seed.ts --reset",
+    "backfill:domains": "ts-node --project tsconfig.json src/scripts/backfill-doubt-domains.ts",
+    "backfill:domains:write": "ts-node --project tsconfig.json src/scripts/backfill-doubt-domains.ts --write",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "backfill:mcq": "ts-node --project tsconfig.json src/scripts/backfill-mcq.ts"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "mongoose": "^8.5.1"
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.1",
+    "nodemailer": "^6.9.14",
+    "pino": "^9.14.0",
+    "pino-pretty": "^13.1.3",
+    "uuid": "^10.0.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.0",
+    "@types/nodemailer": "^6.4.15",
+    "@types/uuid": "^10.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
   }
 }

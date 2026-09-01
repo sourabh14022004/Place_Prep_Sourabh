@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useClerk, useUser } from "@clerk/nextjs";
 import {
   LayoutDashboard, Users, GraduationCap, UserCog,
   Bell, HelpCircle, Calendar, FileText, LogOut,
   Activity, MessageSquare, Dumbbell, Briefcase,
-  Trophy, BookCopy,
+  Trophy, BookCopy, ClipboardList, Building2,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const navGroups = [
@@ -23,6 +23,13 @@ const navGroups = [
       { name: "Students", href: "/students", icon: GraduationCap },
       { name: "Faculty", href: "/faculty", icon: Users },
       { name: "Manage Faculty", href: "/manage-faculty", icon: UserCog },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { name: "Questions", href: "/questions", icon: ClipboardList },
+      { name: "Companies", href: "/companies", icon: Building2 },
     ],
   },
   {
@@ -49,72 +56,71 @@ const navGroups = [
       { name: "Reports", href: "/reports", icon: FileText },
     ],
   },
+  {
+    label: "System",
+    items: [
+      { name: "Feature Controls", href: "/features", icon: SlidersHorizontal },
+    ],
+  },
 ];
 
 export function SidebarContent() {
   const pathname = usePathname();
-  const { signOut } = useClerk();
-  const { user: clerkUser, isLoaded } = useUser();
 
-  const realName = isLoaded && clerkUser ? (clerkUser.fullName || clerkUser.firstName || "Admin User") : "Admin User";
-  const realEmail = isLoaded && clerkUser ? (clerkUser.primaryEmailAddress?.emailAddress || "admin@nst.edu") : "admin@nst.edu";
-  const realImage = isLoaded && clerkUser ? clerkUser.imageUrl : undefined;
-  const initials = isLoaded && clerkUser && clerkUser.firstName ? `${clerkUser.firstName[0]}${clerkUser.lastName?.[0] || ""}`.toUpperCase() : "AD";
-
-  const handleLogout = async () => {
-    document.cookie = "admin_authed=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    try {
-      sessionStorage.clear();
-      localStorage.clear();
-    } catch {}
-    try {
-      if (signOut) {
-        await signOut({ redirectUrl: "/login" });
-      }
-    } catch {}
-    window.location.href = "/login";
-  };
+  const isActive = (href: string) =>
+    href === "/overview"
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <div className="flex h-full w-full flex-col bg-white pt-3">
-      {/* Admin User Info pill */}
-      <div className="mx-3 mb-3 flex items-center gap-2.5 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 shrink-0">
-        {realImage ? (
-          <img src={realImage} alt={realName} className="h-7 w-7 rounded-full object-cover shrink-0" />
-        ) : (
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-700 text-[10px] font-bold text-white">
-            {initials}
-          </div>
-        )}
+    <div className="flex h-full w-full flex-col bg-white overflow-y-auto">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 shrink-0">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">
+          NST
+        </div>
+        <div>
+          <h1 className="text-sm font-bold leading-tight text-gray-900">PlacePrep</h1>
+          <p className="text-[10px] font-medium text-gray-400">Admin Portal</p>
+        </div>
+      </div>
+
+      {/* Admin Info */}
+      <div className="mx-3 mt-3 mb-2 flex items-center gap-2.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 shrink-0">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+          AD
+        </div>
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-gray-900">{realName}</p>
-          <p className="truncate text-[10px] text-gray-400 font-medium">{realEmail}</p>
+          <p className="truncate text-xs font-semibold text-gray-900">Admin User</p>
+          <p className="truncate text-[10px] text-gray-400">Super Admin</p>
         </div>
       </div>
 
       {/* Grouped Navigation */}
-      <nav className="flex-1 px-3 pb-2 overflow-y-auto">
+      <nav className="flex-1 px-3 pb-2">
         {navGroups.map((group) => (
-          <div key={group.label} className="mb-3">
-            <p className="px-3 mb-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <div key={group.label} className="mb-2">
+            <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
               {group.label}
             </p>
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/overview" && pathname.startsWith(item.href + "/"));
+                const active = isActive(item.href);
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive
+                    className={`group flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                      active
                         ? "bg-blue-50 text-blue-600"
                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                     }`}
                   >
-                    <item.icon className="w-4 h-4 shrink-0" />
+                    <item.icon
+                      className={`h-4 w-4 flex-shrink-0 ${
+                        active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-500"
+                      }`}
+                    />
                     {item.name}
                   </Link>
                 );
@@ -124,32 +130,33 @@ export function SidebarContent() {
         ))}
       </nav>
 
-      {/* Bottom section */}
-      <div className="border-t border-gray-200 p-3 shrink-0 space-y-0.5">
+      {/* Bottom */}
+      <div className="border-t border-gray-100 p-3 shrink-0">
         <Link
           href="/help"
-          className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`group flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
             pathname === "/help"
               ? "bg-blue-50 text-blue-600"
               : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           }`}
         >
-          <HelpCircle className="w-4 h-4 shrink-0 text-gray-400" />
+          <HelpCircle className="h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-gray-500" />
           Help
         </Link>
         <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+          onClick={async () => {
+            await fetch("/api/auth/logout", { method: "POST" });
+            const loginUrl = process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL
+              ? `${process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL}/login`
+              : "http://localhost:3000/login";
+            window.location.href = loginUrl;
+          }}
+          className="w-full group flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors cursor-pointer"
         >
-          <LogOut className="w-4 h-4 shrink-0 text-gray-400" />
+          <LogOut className="h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-gray-500" />
           Logout
         </button>
-        <div className="pt-2.5 mt-1 border-t border-gray-100 flex items-center gap-2 px-3">
-          <img src="/newton-school-logo.png" alt="NST Logo" className="h-6 w-6 object-contain shrink-0" />
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-            PlacePrep
-          </span>
-        </div>
+        <p className="px-3 pt-2 text-[10px] text-gray-300">NST Interview Intelligence</p>
       </div>
     </div>
   );
@@ -157,8 +164,8 @@ export function SidebarContent() {
 
 export default function Sidebar() {
   return (
-    <aside className="hidden border-r border-gray-200 lg:fixed lg:top-14 lg:bottom-0 lg:flex lg:w-[216px] lg:flex-col z-40 bg-white">
+    <div className="hidden border-r border-gray-100 lg:fixed lg:inset-y-0 lg:flex lg:w-[var(--sidebar-width)] lg:flex-col z-50">
       <SidebarContent />
-    </aside>
+    </div>
   );
 }

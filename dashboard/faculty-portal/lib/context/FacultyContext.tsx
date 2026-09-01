@@ -1,20 +1,37 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { FacultyMember, mockFacultyMembers, CURRENT_FACULTY_ID } from "@/lib/facultyMembers";
+
+// Minimal faculty shape used by context consumers
+export interface FacultyMember {
+  id: string;
+  name: string;
+  subjects: string[];
+  doubtsSolvedThisMonth: number;
+  doubtsSolvedAllTime: number;
+}
+
+// Default placeholder — real data comes from /api/faculty/dashboard via SWR
+const DEFAULT_FACULTY: FacultyMember = {
+  id: "current",
+  name: "Faculty",
+  subjects: [],
+  doubtsSolvedThisMonth: 0,
+  doubtsSolvedAllTime: 0,
+};
 
 interface FacultyContextType {
   facultyMembers: FacultyMember[];
-  currentFaculty: FacultyMember | undefined;
+  currentFaculty: FacultyMember;
   updateFacultySolvedCount: (facultyId: string) => void;
 }
 
 const FacultyContext = createContext<FacultyContextType | undefined>(undefined);
 
 export function FacultyProvider({ children }: { children: ReactNode }) {
-  const [facultyMembers, setFacultyMembers] = useState<FacultyMember[]>(mockFacultyMembers);
+  const [facultyMembers, setFacultyMembers] = useState<FacultyMember[]>([DEFAULT_FACULTY]);
 
-  const currentFaculty = facultyMembers.find((f) => f.id === CURRENT_FACULTY_ID);
+  const currentFaculty = facultyMembers[0] ?? DEFAULT_FACULTY;
 
   const updateFacultySolvedCount = (facultyId: string) => {
     setFacultyMembers((prev) =>

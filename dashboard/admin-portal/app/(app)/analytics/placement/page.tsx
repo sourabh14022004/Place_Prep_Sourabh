@@ -28,7 +28,7 @@ export default function PlacementPage() {
   if (isLoading) return <Skeleton />;
   if (!data) return null;
 
-  const placed2023 = data.batchPlacementRate.find((b) => b.batch === "2023");
+  const placed2023 = data.batchPlacementRate.find((b: { batch: string; rate: number; placed: number; total: number }) => b.batch === "2023");
 
   const kpis = [
     { label: "Top Target Company", value: data.companyInterest[0]?.company ?? "—", icon: Building2, color: "blue" },
@@ -94,7 +94,7 @@ export default function PlacementPage() {
         <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-800 mb-3">Batch-wise Placement Rate</h2>
           <div className="space-y-3 mt-2">
-            {data.batchPlacementRate.map((b) => (
+            {(data.batchPlacementRate as { batch: string; rate: number; placed: number; total: number }[]).map((b) => (
               <div key={b.batch}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold text-gray-700">Batch {b.batch}</span>

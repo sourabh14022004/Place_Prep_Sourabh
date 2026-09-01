@@ -1,28 +1,36 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
+import { FeatureGate } from "@/lib/features";
+import { CompanyLogo } from "@/components/ui";
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
-  Zap, Plus, X, CheckCircle, Clock, XCircle, Check,
+import { Zap, Plus, X, CheckCircle, Clock, XCircle, Check,
   ChevronRight, ChevronDown, ChevronUp, ThumbsUp,
   History, Code, Sparkles, Filter, ArrowUpDown, Star, Layers
 } from "lucide-react";
+import { mutate as globalMutate } from 'swr'; // BUG-FIX E1: live XP badge + SWR cache sync
 import { useNavbar } from "@/lib/navbar-context";
+import { useCompanies } from "@/lib/hooks";
+import { usePageTitle } from "@/lib/use-page-title";
 
-// Mock logos matching Stitch and other company logos
-const logos: Record<string, string> = {
-  Google: "https://lh3.googleusercontent.com/aida-public/AB6AXuAL63YaQlCTo09Zku1cqyIzG3xEfrukR1_1YSdNH_fIn7sACmgE3gMisae0jNWnL0JspExkSlRVTEn2HMKGIqxn85PUIKwxBKN8PIULnXETMPCZ3kiSGLD3HcvmPl4ZTcxGe8HX8znSZPig8KoQPRjH7uk063p0IthnhZFKqsEXuZZbCZza_UjwhEBmarO-o6dTaP-w2tbIEds4hw0OKzoBlncRUzUs1J_7hawmfRX6tGd4NntS9WbWxKn94uAsOHqBgTSK4AnYHBhf",
-  Amazon: "https://lh3.googleusercontent.com/aida-public/AB6AXuCVGzGyzCRo-X8CIdRm1Aatp6lKupjl_G42KpNqwN5zGBZYFUckrUJ17QtrE4Dfgr4ma_wSEZGZWCY7mdk9QJ0VdFF0ONtcf9_iQW6bJ_s1UhlKZsKGPf4omDhc9dqKCR6m_iRD55aytexKO28l7quQXn_n1dxjJz1xdA8oWjMtfX9PD2uMdTCY5kpBQaRj7ni1lJnOOy2o1hn5DLo4VqT4Fij8WuIa61zMPXxkFMJaPNjPU4pxcrhhuq-9IZbksafPxtvW73ZZfu63",
-  Microsoft: "https://lh3.googleusercontent.com/aida-public/AB6AXuDhuXLkHZDPcAy4XvMJPw67imDyTAjmHdup2A9VGo3-SRjKRfu_LOT4Iu7ZE8UtCS8alFYSfPYPemKC2iKUDzKFaF9UhAcyfMfNKlqXu51iUwdCu3yI8kpFeuCsqfyFapD9wJiP3KA_nd02x1I-6FgNYU9DJuT-3lX0OXstdNIGrZI8yxa9klG0shaBqrBUtHHZwI5hnOr_Ii2XWyquuKQDDZc-OWY3NBQ00ctZeG1-mboNBLU_r71miQbay8cIMfuG-mOwCjOOrzgG",
-  Oracle: "https://lh3.googleusercontent.com/aida-public/AB6AXuBt--Bjh49LYHRDqjL-sGCT5qd5lGsNgmCPazwoRF50sqWcFZYzOCwddHULAy0oVZ-UqkPpMZt1b0orruHo7HKjB2d23i5n4wEN_QpRDgUNRoS21qLVtOiraT9qQffLakfduOiyK18liwk04Qdg6uyKocz4Q_ujX9gA-AgBAeXMOmiWDcRDI87XWSHJCDCgHI7GpqfXQA5meH5HaxFU0YaWxYONZZmKSPpJlIu0GqYVfOujjdy-mGD8-DoP9qrSz7w887D2Sy6DDkBC",
-  "Goldman Sachs": "https://lh3.googleusercontent.com/aida-public/AB6AXuDdcYKnUW5FRfN85A6hcvfcQc4YWouCSzoIAHEXhesOXOl5lBcmldkCmnI5E8AZ6keWKUVO_VvARuVV-5VfLSnljZfksDSx1ODaI6Diuik2ZhzRBlZ5TyHWJP8dcOl_d6oHMKDtcmfh6vyry8FUrSEzjfIkC4m27wq8eGPJhyNIDH1uG98va-z_rkEd3UXd6AgtUvZHOR1VymVKgYhW04Ci4pLqJFAIADg58zfR_O7BZF9o6LW_yxuUjGTJRvAGOtIvrAHmQwzzHHW9",
-  Uber: "https://lh3.googleusercontent.com/aida-public/AB6AXuC_9GpoBxbsK9qtZSMXC828cF1TybC934juVeq1JZMNymJ8sCTfx3EU9IsvTQ7iCPHVnaXm-Ji0f1kOXZbiL_Qe64l8GA6CP0ncofY_jXfmMOVf6cuylumvNf95IFA7VpUGKo93yS9tKpKtMMEZ-Ed4heMDq7YmD9QDteFo2_-wwlXbGiGgTUE0RLE78OqOuDOLHRLI90GHxnlqcJATDF3-L_EDoZWmZdVZ0EWwyjZyJqwF8lhIQfL0QqI3YELn94SPrUsiHQOZcJJ6",
-  Meta: "https://cdn-icons-png.flaticon.com/512/6033/6033716.png",
-  Apple: "https://cdn-icons-png.flaticon.com/512/0/747.png"
-};
+// BUG-EX3 FIX: Google Favicon API for logos — no broken hardcoded CDN URLs
+function getCompanyLogoUrl(companyName: string): string {
+  const slugMap: Record<string, string> = {
+    'Google': 'google.com', 'Amazon': 'amazon.com', 'Microsoft': 'microsoft.com',
+    'Meta': 'meta.com', 'Apple': 'apple.com', 'Flipkart': 'flipkart.com',
+    'Uber': 'uber.com', 'Oracle': 'oracle.com', 'Adobe': 'adobe.com',
+    'Goldman Sachs': 'goldmansachs.com', 'Infosys': 'infosys.com', 'TCS': 'tata.com',
+    'Razorpay': 'razorpay.com', 'Swiggy': 'swiggy.com', 'Paytm': 'paytm.com',
+    'Wipro': 'wipro.com', 'Accenture': 'accenture.com', 'Deloitte': 'deloitte.com',
+    'Airtel': 'airtel.in', 'Netcracker': 'netcracker.com', 'Netcracker Technology': 'netcracker.com',
+  };
+  const domain = slugMap[companyName] || `${companyName.toLowerCase().replace(/\s+/g, '')}.com`;
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+}
 
-const companies = ["Google", "Amazon", "Microsoft", "Flipkart", "TCS", "Infosys", "Razorpay", "Swiggy", "Paytm", "Adobe", "Oracle", "Goldman Sachs", "Uber", "Meta", "Apple"];
+// BUG-EX2 FIX: Fallback list used only if API fails to load; real list comes from useCompanies()
+const FALLBACK_COMPANIES = ["Google", "Amazon", "Microsoft", "Flipkart", "TCS", "Infosys", "Razorpay", "Swiggy", "Paytm", "Adobe", "Oracle", "Goldman Sachs", "Uber", "Meta", "Apple", "Wipro", "Accenture"];
 
 interface InterviewRound {
   roundNumber: number;
@@ -33,7 +41,7 @@ interface InterviewRound {
 }
 
 interface Experience {
-  id: number;
+  id: string;
   company: string;
   logoUrl: string;
   role: string;
@@ -46,169 +54,112 @@ interface Experience {
   author: string;
   authorRole: string;
   postedAgo: string;
+  createdAt?: string;
   upvotes: number;
   hasUpvoted: boolean;
   hasBookmarked: boolean;
   rounds: InterviewRound[];
 }
 
-const initialExperiences: Experience[] = [
-  {
-    id: 1,
-    company: "Google",
-    logoUrl: logos.Google,
-    role: "Software Engineering Intern",
-    roundsCount: 3,
-    problemsCount: 3,
-    outcome: "offer",
-    difficulty: "Medium",
-    workType: "Remote",
-    experience: "Google interviews are fast-paced and time-bound, so it is crucial to practice with that environment in mind. Don't underestimate the importance of edge case discussions, dry runs, and being able to explain your solution with confidence.",
-    author: "Agrawal",
-    authorRole: "Final-year student",
-    postedAgo: "380 days ago",
-    upvotes: 389,
-    hasUpvoted: false,
-    hasBookmarked: false,
-    rounds: [
-      { roundNumber: 1, type: "DSA Coding", topics: ["Arrays", "Sliding Window"], description: "Asked 2 medium coding questions on array manipulation and sliding window. The interviewer focused heavily on code quality and optimizing space complexity.", cleared: true },
-      { roundNumber: 2, type: "DSA Coding", topics: ["Dynamic Programming", "Trees"], description: "Asked to optimize a 2D dynamic programming problem on grid pathfinding. Then a follow-up on representing the grid as a graph/tree.", cleared: true },
-      { roundNumber: 3, type: "HR / Googlyness", topics: ["Behavioral", "Googlyness"], description: "Standard behavioral questions using STAR method. Focused on conflict resolution, leadership traits, and team alignment.", cleared: true }
-    ]
-  },
-  {
-    id: 2,
-    company: "Amazon",
-    logoUrl: logos.Amazon,
-    role: "SDE Intern (6M)",
-    roundsCount: 1,
-    problemsCount: 2,
-    outcome: "offer",
-    difficulty: "Medium",
-    workType: "On-site",
-    experience: "The SDE Intern process at Amazon was direct. Mostly focused on core data structures and standard Amazon Leadership Principles. Make sure you tie every behavioral answer back to leadership principles.",
-    author: "Verma",
-    authorRole: "Pre-final year student",
-    postedAgo: "12 days ago",
-    upvotes: 237,
-    hasUpvoted: false,
-    hasBookmarked: false,
-    rounds: [
-      { roundNumber: 1, type: "DSA Coding", topics: ["Heaps", "Graphs"], description: "Asked to implement a min-heap based priority queue for task scheduling. The second question was finding shortest path in a weighted graph.", cleared: true }
-    ]
-  },
-  {
-    id: 3,
-    company: "Microsoft",
-    logoUrl: logos.Microsoft,
-    role: "SDE-1",
-    roundsCount: 4,
-    problemsCount: 5,
-    outcome: "offer",
-    difficulty: "Hard",
-    workType: "Hybrid",
-    experience: "Focused heavily on operating systems, system architecture, and low-level data structures. They expect clean code and a deep understanding of memory management. Be prepared for dry-running code.",
-    author: "Ranjan",
-    authorRole: "Alumnus (2025)",
-    postedAgo: "30 days ago",
-    upvotes: 184,
-    hasUpvoted: false,
-    hasBookmarked: false,
-    rounds: [
-      { roundNumber: 1, type: "Online Assessment", topics: ["Algorithms", "Bit Manipulation"], description: "Three tasks focusing on bit-level operations and sorting algorithms. 90 minutes limit.", cleared: true },
-      { roundNumber: 2, type: "DSA Coding", topics: ["Linked Lists", "Trees"], description: "Standard MS coding round: reverse nodes in k-group and check if binary tree is BST.", cleared: true },
-      { roundNumber: 3, type: "System Design", topics: ["LLD", "Design Patterns"], description: "Designed a parking lot system. Interviewer checked object-oriented design and SOLID principles.", cleared: true },
-      { roundNumber: 4, type: "HR", topics: ["Resume Review", "Behavioral"], description: "Detailed walkthrough of past internship projects and questions about work ethic and collaboration.", cleared: true }
-    ]
-  },
-  {
-    id: 4,
-    company: "Uber",
-    logoUrl: logos.Uber,
-    role: "Software Engineer (L4)",
-    roundsCount: 4,
-    problemsCount: 3,
-    outcome: "offer",
-    difficulty: "Hard",
-    workType: "On-site",
-    experience: "Uber's L4 interviews focus on highly scalable architecture and advanced graphs/algorithms. Be prepared to dive deep into system trade-offs and latency.",
-    author: "Sharma",
-    authorRole: "NST Student",
-    postedAgo: "2 days ago",
-    upvotes: 95,
-    hasUpvoted: false,
-    hasBookmarked: false,
-    rounds: [
-      { roundNumber: 1, type: "DSA Coding", topics: ["Graphs", "Shortest Path"], description: "Standard graph optimization problem with custom constraints.", cleared: true },
-      { roundNumber: 2, type: "DSA Coding", topics: ["Dynamic Programming"], description: "Asked to optimize a 2D dynamic programming problem with space optimizations.", cleared: true },
-      { roundNumber: 3, type: "System Design", topics: ["System Design", "Graphs"], description: "Designed a distributed rate limiter and ride matching system.", cleared: true },
-      { roundNumber: 4, type: "HR", topics: ["Behavioral"], description: "Behavioral interview focused on customer obsession and dealing with ambiguity.", cleared: true }
-    ]
-  },
-  {
-    id: 5,
-    company: "Meta",
-    logoUrl: logos.Meta,
-    role: "Production Engineer",
-    roundsCount: 5,
-    problemsCount: 4,
-    outcome: "offer",
-    difficulty: "Medium",
-    workType: "Hybrid",
-    experience: "Meta checks system internals, scripting ability, and practical troubleshooting. Expect systems and networks design with focus on scalability.",
-    author: "Patel",
-    authorRole: "NST Student",
-    postedAgo: "5 days ago",
-    upvotes: 82,
-    hasUpvoted: false,
-    hasBookmarked: false,
-    rounds: [
-      { roundNumber: 1, type: "Systems Coding", topics: ["Linux", "Python"], description: "Scripting and systems automation tools analysis.", cleared: true },
-      { roundNumber: 2, type: "Systems Networking", topics: ["OS", "Networking"], description: "Troubleshooting Linux system performance, memory bottlenecks and network congestion issues.", cleared: true }
-    ]
-  },
-  {
-    id: 6,
-    company: "Apple",
-    logoUrl: logos.Apple,
-    role: "Frontend Engineer",
-    roundsCount: 3,
-    problemsCount: 2,
-    outcome: "offer",
-    difficulty: "Medium",
-    workType: "On-site",
-    experience: "Apple values perfection in UI rendering, web performance, and core JS knowledge. Brush up on DOM rendering lifecycles and layout optimization.",
-    author: "Das",
-    authorRole: "NST Student",
-    postedAgo: "1 week ago",
-    upvotes: 64,
-    hasUpvoted: false,
-    hasBookmarked: false,
-    rounds: [
-      { roundNumber: 1, type: "Frontend Coding", topics: ["React", "JS Core"], description: "Built custom component implementing performant list virtualization.", cleared: true },
-      { roundNumber: 2, type: "UI Architecture", topics: ["Web Performance", "System Design"], description: "Design a client-side telemetry and logging system with offline caching support.", cleared: true }
-    ]
-  }
-];
 
-const popularCompanies = [
-  { name: "Amazon", slug: "amazon", logo: logos.Amazon, type: "Product Based", count: 51 },
-  { name: "Microsoft", slug: "microsoft", logo: logos.Microsoft, type: "Product Based", count: 30 },
-  { name: "Google", slug: "google", logo: logos.Google, type: "Product Based", count: 21 },
-  { name: "Oracle", slug: "oracle", logo: logos.Oracle, type: "Product Based", count: 17 },
-  { name: "Goldman Sachs", slug: "goldman-sachs", logo: logos["Goldman Sachs"], type: "Service Based", count: 12 },
-  { name: "Uber", slug: "uber", logo: logos.Uber, type: "Product Based", count: 11 }
+
+// BUG-EX5 FIX: No longer hardcoded — fetched dynamically from DB in SubmitContent component
+// Static fallback only used if API call fails (e.g. network error on load)
+const FALLBACK_POPULAR_COMPANIES = [
+  { name: "Amazon",       slug: "amazon",       logo: getCompanyLogoUrl("Amazon"),       type: "Product Based", count: null },
+  { name: "Microsoft",    slug: "microsoft",    logo: getCompanyLogoUrl("Microsoft"),    type: "Product Based", count: null },
+  { name: "Google",       slug: "google",       logo: getCompanyLogoUrl("Google"),       type: "Product Based", count: null },
+  { name: "Oracle",       slug: "oracle",       logo: getCompanyLogoUrl("Oracle"),       type: "Product Based", count: null },
+  { name: "Goldman Sachs",slug: "goldman-sachs",logo: getCompanyLogoUrl("Goldman Sachs"),type: "Service Based", count: null },
+  { name: "Uber",         slug: "uber",         logo: getCompanyLogoUrl("Uber"),         type: "Product Based", count: null },
 ];
 
 function SubmitContent() {
   const { setOnSubmitClick } = useNavbar();
   const searchParams = useSearchParams();
-  const [experiences, setExperiences] = useState<Experience[]>(initialExperiences);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [loadingExp, setLoadingExp] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // BUG-EX5 FIX: Dynamic popular companies from DB
+  const [popularCompanies, setPopularCompanies] = useState(FALLBACK_POPULAR_COMPANIES);
+  useEffect(() => {
+    fetch('/api/experiences/popular-companies', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => {
+        const companies = json?.data?.companies ?? json?.companies ?? [];
+        if (Array.isArray(companies) && companies.length > 0) {
+          setPopularCompanies(
+            companies.map((c: any) => ({
+              name: c.name || c.slug,
+              slug: c.slug,
+              logo: getCompanyLogoUrl(c.name || c.slug),
+              type: 'Product Based',
+              count: c.count,
+            }))
+          );
+        }
+      })
+      .catch(() => { /* keep fallback */ });
+  }, []);
+
+  // BUG-EX2 FIX: Load real company names from DB instead of hardcoded list
+  const { data: companiesData } = useCompanies();
+  const dbCompanyNames: string[] = Array.isArray(companiesData)
+    ? companiesData.map((c: any) => c.name).filter(Boolean)
+    : Array.isArray(companiesData?.companies)
+    ? companiesData.companies.map((c: any) => c.name).filter(Boolean)
+    : [];
+  // Merge DB names with fallback (deduped), sorted alphabetically
+  const allCompanyNames = [...new Set([...dbCompanyNames, ...FALLBACK_COMPANIES])].sort();
+
+  // Load experiences from API on mount
+  useEffect(() => {
+    fetch('/api/experiences', { credentials: 'include' })
+      .then(r => r.json())
+      .then(json => {
+        const raw = json?.data?.experiences ?? json?.experiences ?? json?.data ?? [];
+        if (Array.isArray(raw) && raw.length > 0) {
+          const mapped = raw.map((e: any) => ({
+            id:           String(e._id ?? e.id ?? crypto.randomUUID()),
+            company:      e.companyName ?? e.company ?? '',
+            logoUrl:      getCompanyLogoUrl(e.companyName ?? e.company ?? ''),
+            role:         e.role ?? '',
+            roundsCount:  e.rounds?.length ?? e.roundsCount ?? 1,
+            problemsCount: e.problemsCount ?? 0,
+            outcome:      e.outcome ?? 'waiting',
+            difficulty:   e.difficulty ?? 'Medium',
+            workType:     e.workType ?? 'Hybrid',
+            experience:   e.experienceText ?? e.experience ?? '',
+            author:       e.authorName ?? e.author ?? 'Student',
+            authorRole:   e.authorRole ?? 'NST Student',
+            postedAgo:    e.createdAt ? new Date(e.createdAt).toLocaleDateString() : 'Recently',
+            createdAt:    e.createdAt ?? undefined,
+            upvotes:      e.upvoteCount ?? e.upvotes ?? 0,  // DB field is upvoteCount, not upvotes
+            hasUpvoted:   e.isUpvoted ?? e.hasUpvoted ?? false,  // DB field is isUpvoted
+            hasBookmarked: e.hasBookmarked ?? false,
+            rounds:       (e.rounds ?? []).map((r: any, i: number) => ({
+              roundNumber:  i + 1,
+              type:         r.type ?? 'DSA Coding',
+              topics:       r.topics ?? [],
+              description:  r.description ?? '',
+              cleared:      r.cleared ?? true,
+            })),
+          }));
+          setExperiences(mapped);
+        } else {
+          // API returned empty, clear experiences
+          setExperiences([]);
+        }
+      })
+      .catch(() => setExperiences([]))
+      .finally(() => setLoadingExp(false));
+  }, []);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [xpAwarded, setXpAwarded] = useState<number>(50); // BUG-FIX E1: real XP from server response
 
   // Filters state
   const [filterDifficulty, setFilterDifficulty] = useState<string>("All");
@@ -218,8 +169,10 @@ function SubmitContent() {
   useEffect(() => {
     const expand = searchParams?.get("expand");
     if (expand) {
-      const id = parseInt(expand, 10);
-      if (!isNaN(id)) {
+      // DEEP-LINK FIX: ids are Mongo ObjectId strings — parseInt mangled them so
+      // dashboard → "expand this report" never matched anything.
+      const id = decodeURIComponent(expand);
+      if (id) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         setTimeout(() => {
           setExpandedId(id);
@@ -296,7 +249,10 @@ function SubmitContent() {
     }
   };
 
-  const handleUpvote = (id: number) => {
+  // BUG-EX4 FIX: Upvote now persists via API (/api/experiences/:id/upvote)
+  // Previously only updated local state — reset on every page reload
+  const handleUpvote = async (id: string) => {
+    // Optimistic update
     setExperiences((prev) =>
       prev.map((exp) => {
         if (exp.id === id) {
@@ -309,14 +265,49 @@ function SubmitContent() {
         return exp;
       })
     );
+    // Persist to API
+    try {
+      const res = await fetch(`/api/experiences/${id}/upvote`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const serverData = json?.data ?? json;
+        // Sync local state with server's authoritative count
+        setExperiences((prev) =>
+          prev.map((exp) =>
+            exp.id === id
+              ? { ...exp, upvotes: serverData.upvoteCount ?? exp.upvotes, hasUpvoted: serverData.isUpvoted ?? exp.hasUpvoted }
+              : exp
+          )
+        );
+      }
+    } catch {
+      // Rollback optimistic update on network error
+      setExperiences((prev) =>
+        prev.map((exp) => {
+          if (exp.id === id) {
+            return {
+              ...exp,
+              upvotes: exp.hasUpvoted ? exp.upvotes + 1 : exp.upvotes - 1,
+              hasUpvoted: !exp.hasUpvoted,
+            };
+          }
+          return exp;
+        })
+      );
+    }
   };
+
 
   const handleCompanyQueryChange = (q: string) => {
     setFormCompanyQuery(q);
     setFormCompany(q); // allow free-text company name too
     if (q.trim().length > 0) {
       const lower = q.toLowerCase();
-      const matches = companies.filter((c) => c.toLowerCase().includes(lower)).slice(0, 6);
+      // BUG-EX2 FIX: Use real DB company names from useCompanies hook
+      const matches = allCompanyNames.filter((c) => c.toLowerCase().includes(lower)).slice(0, 6);
       setFormCompanySuggestions(matches);
       setFormCompanyOpen(matches.length > 0);
     } else {
@@ -356,17 +347,18 @@ function SubmitContent() {
     clearForm();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formExperienceText.trim()) {
       alert("Please describe your interview experience.");
       return;
     }
 
+    const optimisticId = `local-${Date.now()}`;
     const newExp: Experience = {
-      id: Date.now(),
+      id: optimisticId,
       company: formCompany,
-      logoUrl: logos[formCompany] || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=60",
+      logoUrl: getCompanyLogoUrl(formCompany),
       role: formRole,
       roundsCount: Number(formRoundsCount) || 1,
       problemsCount: Number(formProblemsCount) || 1,
@@ -377,6 +369,7 @@ function SubmitContent() {
       author: "You (Student)",
       authorRole: "NST Student",
       postedAgo: "Just now",
+      createdAt: new Date().toISOString(),
       upvotes: 0,
       hasUpvoted: false,
       hasBookmarked: false,
@@ -389,8 +382,46 @@ function SubmitContent() {
       })),
     };
 
-    setExperiences([newExp, ...experiences]);
+    // Optimistic update
+    setExperiences(prev => [newExp, ...prev]);
     setFormSubmitted(true);
+
+    // POST to real API
+    try {
+      const res = await fetch('/api/experiences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          companySlug:       formCompany.toLowerCase().replace(/\s+/g, '-'),
+          role:              formRole,
+          outcome:           formOutcome,
+          overallDifficulty: newExp.difficulty,
+          experienceText:    formExperienceText,
+          tips:              formTipsText || undefined,
+          rounds:            newExp.rounds,
+          roundsCount:       Number(formRoundsCount) || 1,
+          interviewDate:     formDate || new Date().toISOString().split('T')[0],
+        }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const saved = json?.data;
+        if (saved?._id) {
+          // Replace optimistic entry with real ID
+          setExperiences(prev => prev.map(exp =>
+            exp.id === optimisticId ? { ...exp, id: saved._id } : exp
+          ));
+        }
+        // BUG-FIX E1: read real XP amount from server response
+        if (saved?.xpAwarded) setXpAwarded(saved.xpAwarded);
+        // BUG-FIX E1: update navbar XP badge immediately + sync shared experiences cache
+        await globalMutate('/api/user/me');
+        await globalMutate('/api/experiences');
+      }
+    } catch {
+      // Keep optimistic entry even on network failure
+    }
   };
 
   // Filter & Sort Logic
@@ -405,9 +436,10 @@ function SubmitContent() {
       if (b.id === expandedId) return 1;
       if (sortBy === "Most Upvoted") {
         return b.upvotes - a.upvotes;
-      } else {
-        return b.id - a.id;
       }
+      // FIX: ids are strings ("b.id - a.id" was always NaN). Sort newest-first
+      // using the raw createdAt captured during mapping.
+      return (new Date(b.createdAt ?? 0).getTime() || 0) - (new Date(a.createdAt ?? 0).getTime() || 0);
     });
 
   return (
@@ -463,8 +495,8 @@ function SubmitContent() {
                     : "border-gray-200 hover:shadow-md"
                 }`}
               >
-                <div className="w-12 h-12 bg-white border border-gray-200 rounded-lg flex items-center justify-center p-2 mb-3 shadow-sm">
-                  <img alt={c.name} className="w-full h-full object-contain animate-fadeIn" src={c.logo} />
+                <div className="mb-3">
+                  <CompanyLogo name={c.name} size={44} />
                 </div>
                 <p className="font-bold text-gray-900 text-sm">{c.name}</p>
                 <span className="text-[9px] uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full mt-2 font-bold shrink-0">
@@ -476,7 +508,7 @@ function SubmitContent() {
                 <Link
                   href={`/companies/${c.slug}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-3 text-[10px] font-semibold text-blue-600 bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all inline-flex items-center shadow-sm"
+                  className="mt-3 text-[10px] font-semibold text-blue-600 bg-white border border-gray-200 px-3 py-1.5 rounded-full hover:bg-gray-50:bg-slate-800/60 hover:border-gray-300 transition-all inline-flex items-center shadow-sm"
                 >
                   View Intel →
                 </Link>
@@ -525,7 +557,10 @@ function SubmitContent() {
                   className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="All">All Companies</option>
-                  {companies.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {/* BUG-EX2 FIX: Company names from DB (not hardcoded 15) */}
+                  {[...new Set(experiences.map(e => e.company))].filter(Boolean).sort().map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
 
@@ -544,7 +579,25 @@ function SubmitContent() {
             </div>
           </div>
 
-          {filteredExperiences.length === 0 ? (
+          {/* LOADING FIX: loadingExp was tracked but never rendered — the feed
+              flashed "No experiences match your filters" on every visit. */}
+          {loadingExp ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm animate-pulse">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 bg-gray-100 rounded-lg" />
+                    <div className="space-y-1.5 flex-1">
+                      <div className="h-3 w-1/4 bg-gray-100 rounded" />
+                      <div className="h-2.5 w-1/3 bg-gray-50 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-3 w-full bg-gray-50 rounded" />
+                  <div className="h-3 w-5/6 bg-gray-50 rounded mt-2" />
+                </div>
+              ))}
+            </div>
+          ) : filteredExperiences.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-xl p-12 text-center shadow-sm">
               <p className="text-gray-500 font-medium mb-2">No experiences match your filters.</p>
               <button
@@ -552,7 +605,7 @@ function SubmitContent() {
                   setFilterCompany("All");
                   setFilterDifficulty("All");
                 }}
-                className="mt-3 px-4 py-2 bg-white text-blue-600 border border-gray-200 rounded-full hover:bg-gray-50 font-semibold text-sm transition-all shadow-sm"
+                className="mt-3 px-4 py-2 bg-white text-blue-600 border border-gray-200 rounded-full hover:bg-gray-50:bg-slate-800/60 font-semibold text-sm transition-all shadow-sm"
               >
                 Reset Filters
               </button>
@@ -566,8 +619,8 @@ function SubmitContent() {
                 >
                   <div className="flex flex-col sm:flex-row sm:justify-between items-start gap-4">
                     <div className="flex gap-4">
-                      <div className="w-12 h-12 border border-gray-200 rounded-lg flex items-center justify-center p-2 shadow-sm bg-white shrink-0">
-                        <img alt={exp.company} className="w-full h-full object-contain" src={exp.logoUrl} />
+                      <div className="shrink-0">
+                        <CompanyLogo name={exp.company} size={44} />
                       </div>
                       <div>
                         <h4 className="font-bold text-gray-900 text-base flex flex-wrap items-center gap-1.5">
@@ -596,7 +649,7 @@ function SubmitContent() {
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${
                           exp.hasUpvoted
                             ? "bg-blue-50 text-blue-600 border-blue-200"
-                            : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                            : "border-gray-200 text-gray-700 hover:bg-gray-50:bg-slate-800/60"
                         }`}
                       >
                         <ThumbsUp className={`w-3.5 h-3.5 ${exp.hasUpvoted ? "fill-blue-600 animate-pulse" : ""}`} />
@@ -670,7 +723,7 @@ function SubmitContent() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setExpandedId(expandedId === exp.id ? null : exp.id)}
-                        className="px-4 py-2 bg-white text-blue-600 border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 font-semibold inline-flex items-center gap-1.5 transition-all text-xs shadow-sm"
+                        className="px-4 py-2 bg-white text-blue-600 border border-gray-200 rounded-full hover:bg-gray-50:bg-slate-800/60 hover:border-gray-300 font-semibold inline-flex items-center gap-1.5 transition-all text-xs shadow-sm"
                       >
                         {expandedId === exp.id ? "Hide Details" : "View Details"}
                         {expandedId === exp.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -703,7 +756,7 @@ function SubmitContent() {
               </div>
               <button
                 onClick={closeModal}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors ml-4 shrink-0"
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100:bg-slate-800 text-gray-400 hover:text-gray-700 transition-colors ml-4 shrink-0"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
@@ -719,13 +772,13 @@ function SubmitContent() {
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">Thank you for contributing!</h3>
                   <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-6 py-3 text-amber-800 font-bold text-lg mt-4 mb-4 shadow-sm">
                     <Zap className="w-5 h-5 text-amber-500 fill-amber-500" />
-                    +50 XP Earned!
+                    +{xpAwarded ?? 50} XP Earned! {/* BUG-FIX E1: was hardcoded 50 */}
                   </div>
                   <p className="text-gray-500 text-sm">Your experience will help future NST students prepare better.</p>
                   <div className="flex justify-center gap-3 mt-8">
                     <button
                       onClick={closeModal}
-                      className="border border-gray-300 text-gray-700 text-sm px-5 py-2.5 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                      className="border border-gray-300 text-gray-700 text-sm px-5 py-2.5 rounded-lg hover:bg-gray-50:bg-slate-800/60 transition-colors font-medium"
                     >
                       Back to Feed
                     </button>
@@ -816,7 +869,7 @@ function SubmitContent() {
                               type="button"
                               key={key}
                               onClick={() => setFormOutcome(key)}
-                              className={`flex-1 text-xs font-medium py-2.5 rounded-lg border transition-all flex items-center justify-center gap-1.5 ${ formOutcome === key ? activeClass : "border-gray-200 text-gray-700 hover:bg-gray-50"}`}
+                              className={`flex-1 text-xs font-medium py-2.5 rounded-lg border transition-all flex items-center justify-center gap-1.5 ${ formOutcome === key ? activeClass : "border-gray-200 text-gray-700 hover:bg-gray-50:bg-slate-800/60"}`}
                             >
                               <Icon className="w-3.5 h-3.5" />{label}
                             </button>
@@ -898,7 +951,7 @@ function SubmitContent() {
                         <span className="text-sm font-semibold text-gray-700">Round-wise Experience</span>
                       </div>
                       {Array.from({ length: typeof formRoundsCount === 'number' ? formRoundsCount : 0 }, (_, i) => (
-                        <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
+                        <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Round {i + 1}</span>
                             <div className="flex items-center gap-2">
@@ -1004,7 +1057,8 @@ function SubmitContent() {
   );
 }
 
-export default function SubmitPage() {
+function SubmitPageInner() {
+  usePageTitle("Interview Experiences");
   return (
     <Suspense fallback={
       <div className="space-y-4 max-w-[1200px] mx-auto py-12">
@@ -1016,5 +1070,14 @@ export default function SubmitPage() {
     }>
       <SubmitContent />
     </Suspense>
+  );
+}
+
+// Admin feature-toggle gate (Feature Controls → student.experience)
+export default function SubmitPageGate() {
+  return (
+    <FeatureGate feature="student.experience" title="Interview Experiences">
+      <SubmitPageInner  />
+    </FeatureGate>
   );
 }

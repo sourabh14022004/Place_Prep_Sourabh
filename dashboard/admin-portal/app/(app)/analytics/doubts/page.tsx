@@ -134,7 +134,7 @@ export default function DoubtsIntelPage() {
                   outerRadius={62}
                   paddingAngle={2}
                 >
-                  {data.bySubject.map((_, i) => (
+                  {(data.bySubject as { subject: string; count: number }[]).map((_: { subject: string; count: number }, i: number) => (
                     <Cell key={i} fill={SUBJECT_COLORS[i % SUBJECT_COLORS.length]} />
                   ))}
                 </Pie>
@@ -142,7 +142,7 @@ export default function DoubtsIntelPage() {
               </PieChart>
             </ResponsiveContainer>
             <div className="flex-1 space-y-1.5">
-              {data.bySubject.map((s, i) => (
+              {(data.bySubject as { subject: string; count: number }[]).map((s: { subject: string; count: number }, i: number) => (
                 <div key={s.subject} className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: SUBJECT_COLORS[i % SUBJECT_COLORS.length] }} />
                   <span className="text-[11px] text-gray-700 flex-1">{s.subject}</span>
@@ -173,7 +173,7 @@ export default function DoubtsIntelPage() {
         <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-gray-800 mb-3">Faculty-wise Resolution</h2>
           <div className="space-y-2.5 overflow-y-auto max-h-[180px] pr-1">
-            {data.byFaculty.map((f, i) => (
+            {(data.byFaculty as { facultyId: string; name: string; rate: number }[]).map((f: { facultyId: string; name: string; rate: number }, i: number) => (
               <div key={f.facultyId} className="flex items-center gap-2.5">
                 <span className="text-[10px] font-bold text-gray-400 w-4 shrink-0">#{i + 1}</span>
                 <span className="text-xs font-medium text-gray-700 truncate flex-1">{f.name}</span>

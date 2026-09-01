@@ -3,6 +3,7 @@
 export interface Student {
   id: number;
   name: string;
+  fullName?: string;   // backend returns fullName; name is kept as fallback
   batch: string;
   progress: number;
   doubts: number;
@@ -57,6 +58,8 @@ export interface OverviewStats {
   serverLoad: number;
   // Phase 2 additions
   totalStudents: number;
+  placedStudents: number;
+  inProgressStudents: number;
   totalFaculty: number;
   activeFaculty: number;
   inactiveFaculty: number;
@@ -68,6 +71,7 @@ export interface OverviewStats {
   mauFaculty: number;
   currentOnlineStudents: number;
   currentOnlineFaculty: number;
+  requestsPerMinute?: number;  // real-time sliding window counter
 }
 
 export interface WeeklySession {

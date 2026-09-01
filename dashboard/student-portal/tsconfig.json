@@ -18,8 +18,14 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "placeprep-backend/*": ["../../backend/*"],
+      "zod": ["../../backend/node_modules/zod"],
+      "zod/*": ["../../backend/node_modules/zod/*"],
+      "next": ["./node_modules/next"],
+      "next/*": ["./node_modules/next/*"]
     }
   },
   "include": [
@@ -30,5 +36,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "stitch_placeprep_nst_interview_intelligence_portal"]
+  "exclude": ["node_modules"]
 }

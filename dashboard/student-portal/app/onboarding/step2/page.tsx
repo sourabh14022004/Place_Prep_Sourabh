@@ -1,11 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   Building2, Briefcase, Server, Rocket, Landmark, MoreHorizontal, CheckCircle,
 } from "lucide-react";
 import Stepper from "@/components/onboarding/Stepper";
-import { CompanyCategory } from "@/lib/mock-data";
+import { type CompanyCategory } from "@/lib/constants";
 
 const categories: { id: CompanyCategory; icon: React.ComponentType<{ className?: string }>; label: string; desc: string }[] = [
   { id: "maang",   icon: Building2,      label: "MAANG / Big Tech",    desc: "Google, Meta, Amazon, Apple, Netflix" },
@@ -18,6 +20,7 @@ const categories: { id: CompanyCategory; icon: React.ComponentType<{ className?:
 
 export default function Step2() {
   const [selected, setSelected] = useState<CompanyCategory[]>([]);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const toggle = (id: CompanyCategory) => {
@@ -52,7 +55,7 @@ export default function Step2() {
             <span className="font-bold text-gray-900 text-sm">PlacePrep</span>
           </div>
 
-          <Stepper currentStep={2} totalSteps={4} />
+          <Stepper currentStep={2} totalSteps={5} />
           <p className="text-xs text-gray-400 mt-2 mb-5">Step 2 of 4</p>
           <h1 className="text-xl font-bold text-gray-900 mb-1">What type of company are you targeting?</h1>
           <p className="text-sm text-gray-500 mb-5">Select all that apply — your prep will be tailored accordingly</p>
@@ -87,25 +90,50 @@ export default function Step2() {
               ← Back
             </button>
             <button
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  sessionStorage.setItem("onboarding_categories", JSON.stringify(selected));
-                  const categoryToSlugs: Record<string, string[]> = {
-                    maang:   ["google", "amazon", "microsoft"],
-                    product: ["flipkart", "razorpay"],
-                    service: ["tcs"],
-                    startup: ["razorpay"],
-                    bfsi:    [],
-                    other:   [],
-                  };
-                  const slugs = [...new Set(selected.flatMap((cat) => categoryToSlugs[cat] ?? []))];
-                  sessionStorage.setItem("onboarding_companies", JSON.stringify(slugs));
+              disabled={loading || selected.length === 0}
+              onClick={async () => {
+                if (typeof window === "undefined") return;
+                sessionStorage.setItem("onboarding_categories", JSON.stringify(selected));
+                setLoading(true);
+                try {
+                  // Fetch real company slugs for each selected category from the DB.
+                  // FIX: use allSettled — a total network failure previously saved an
+                  // empty list silently and step3 then blamed "this role".
+                  const settled = await Promise.allSettled(
+                    selected.map((cat) =>
+                      fetch(`/api/companies?category=${cat}`)
+                        .then((r) => {
+                          if (!r.ok) throw new Error(`API ${r.status}`);
+                          return r.json();
+                        })
+                        .then((d) => (Array.isArray(d.data) ? d.data : []) as Array<{ slug: string }>)
+                    )
+                  );
+                  const seen = new Set<string>();
+                  const slugs: string[] = [];
+                  let okCount = 0;
+                  for (const s of settled) {
+                    if (s.status === "fulfilled") {
+                      okCount++;
+                      for (const c of s.value) {
+                        if (!seen.has(c.slug)) { seen.add(c.slug); slugs.push(c.slug); }
+                      }
+                    }
+                  }
+                  if (okCount === 0) {
+                    setLoading(false);
+                    toast.error("Couldn't load companies. Check your connection and try again.");
+                    return;
+                  }
+                  sessionStorage.setItem("onboarding_companies", JSON.stringify(slugs.slice(0, 6)));
+                } finally {
+                  setLoading(false);
+                  router.push("/onboarding/step3");
                 }
-                router.push("/onboarding/step3");
               }}
-              className="flex-1 bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
+              className="flex-1 bg-gray-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
-              Continue →
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</> : "Continue →"}
             </button>
           </div>
         </div>

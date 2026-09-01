@@ -2,79 +2,71 @@
 
 import { useState, useEffect } from "react";
 import { Mail, Briefcase, Calendar, MapPin, Building2, User, X } from "lucide-react";
-import { useUser } from "@clerk/nextjs";
-import { fetchFacultyProfile, updateFacultyProfile } from "@/lib/api";
+import useSWR from "swr";
+import { formatDistanceToNow } from "date-fns";
+
+const fetcher = (url: string) => fetch(url, { credentials: "include" }).then(r => r.json());
 
 export default function ProfilePage() {
-  const { user, isLoaded } = useUser();
+  const { data: profileResponse, mutate } = useSWR('/api/faculty/profile', fetcher);
+  const profileData = profileResponse?.data;
 
-  const [profile, setProfile] = useState({
-    title: "Senior Faculty, Computer Science Dept.",
-    experience: "12+ Years Experience",
-    campus: "Bangalore Campus",
-    employeeId: "EMP-4092",
-    department: "CS & Engineering",
-    joined: "Aug 2021",
-    expertises: ["Data Structures", "Algorithms", "System Design", "Cloud Architecture"],
-  });
-
-  const [dbName, setDbName] = useState<string | null>(null);
-
-  const realName = dbName || (isLoaded && user ? (user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Prof. Sharma") : "Prof. Sharma");
-  const realEmail = isLoaded && user ? (user.primaryEmailAddress?.emailAddress || "sharma.p@newtonschool.co") : "sharma.p@newtonschool.co";
-  const realImage = isLoaded && user ? user.imageUrl : undefined;
-  const initials = realName ? realName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "PS";
-
-  useEffect(() => {
-    async function loadLiveFaculty() {
-      if (user?.id || user?.primaryEmailAddress?.emailAddress) {
-        const liveData = await fetchFacultyProfile(user.id, user.primaryEmailAddress?.emailAddress);
-        if (liveData) {
-          if (liveData.name) setDbName(liveData.name);
-          setProfile({
-            title: liveData.title || "Senior Faculty, Computer Science Dept.",
-            experience: liveData.experience || "12+ Years Experience",
-            campus: liveData.campus || "Bangalore Campus",
-            employeeId: liveData.employeeId || "EMP-4092",
-            department: liveData.department || "CS & Engineering",
-            joined: liveData.joined || "Aug 2021",
-            expertises: liveData.expertises || ["Data Structures", "Algorithms", "System Design", "Cloud Architecture"],
-          });
-        }
-      }
-    }
-    loadLiveFaculty();
-  }, [user]);
+  const defaultProfile = {
+    name: profileData?.fullName || "",
+    title: profileData?.title || "",
+    experience: profileData?.experience || "",
+    campus: profileData?.campus || "",
+    email: profileData?.email || "",
+    employeeId: profileData?.employeeId || "",
+    department: profileData?.department || "",
+    joined: profileData?.joinedDate || "",
+    expertises: profileData?.expertises?.length ? profileData.expertises : [],
+    stats: profileData?.stats || { studentsMentored: 0, mockInterviews: 0, placementRate: 0, rating: 0 },
+    recentActivity: profileData?.recentActivity || []
+  };
 
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: realName, email: realEmail, ...profile });
+  const [formData, setFormData] = useState({ ...defaultProfile, expertisesStr: defaultProfile.expertises.join(', ') });
   const [showToast, setShowToast] = useState(false);
+
+  useEffect(() => {
+    if (profileData) {
+      const p = { ...defaultProfile };
+      setFormData({
+        ...p,
+        expertisesStr: p.expertises.join(', ')
+      });
+    }
+  }, [profileData]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated = {
-      title: formData.title,
-      experience: formData.experience,
-      campus: formData.campus,
-      employeeId: formData.employeeId,
-      department: formData.department,
-      joined: formData.joined,
-      expertises: profile.expertises,
-    };
-    setProfile(updated);
-
-    // Save live faculty profile to MongoDB Atlas
-    await updateFacultyProfile({
-      clerkUserId: user?.id,
-      email: realEmail,
-      name: formData.name,
-      ...updated,
-    });
-
-    setEditModalOpen(false);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    try {
+      await fetch('/api/faculty/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: formData.name,
+          title: formData.title,
+          department: formData.department,
+          email: formData.email,
+          experience: formData.experience,
+          campus: formData.campus,
+          employeeId: formData.employeeId,
+          joinedDate: formData.joined,
+          expertises: formData.expertisesStr.split(',').map((s: string) => s.trim()).filter(Boolean),
+        }),
+      });
+      await mutate();
+      setEditModalOpen(false);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error(err);
+    }
   };
+
+  const profile = defaultProfile;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 relative animate-in fade-in duration-300">
@@ -89,17 +81,13 @@ export default function ProfilePage() {
         <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
         <div className="px-6 pb-6 relative">
           <div className="w-24 h-24 rounded-full border-4 border-white bg-blue-100 flex items-center justify-center -mt-12 mb-4 shadow-sm overflow-hidden">
-             {realImage ? (
-               <img src={realImage} alt={realName} className="w-full h-full object-cover" />
-             ) : (
-               <div className="flex items-center justify-center w-full h-full bg-blue-600 text-white text-3xl font-bold">
-                 {initials}
-               </div>
-             )}
+             <div className="flex items-center justify-center w-full h-full bg-blue-600 text-white text-3xl font-bold">
+               {profile.name.split(" ").map((n: string) => n[0]).join("")}
+             </div>
           </div>
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{realName}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
               <p className="text-gray-500 font-medium">{profile.title}</p>
               
               <div className="flex flex-wrap gap-4 mt-4 text-sm text-gray-600">
@@ -113,13 +101,13 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Mail className="w-4 h-4 text-gray-400" />
-                  {realEmail}
+                  {profile.email}
                 </div>
               </div>
             </div>
             <button 
               onClick={() => {
-                setFormData({ name: realName, email: realEmail, ...profile });
+                setFormData({ ...profile, expertisesStr: profile.expertises.join(', ') });
                 setEditModalOpen(true);
               }}
               className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors cursor-pointer"
@@ -136,7 +124,7 @@ export default function ProfilePage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">Expertise</h3>
             <div className="flex flex-wrap gap-2">
-              {profile.expertises.map(tag => (
+              {profile.expertises.map((tag: string) => (
                 <span key={tag} className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
                   {tag}
                 </span>
@@ -166,19 +154,19 @@ export default function ProfilePage() {
             <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">Mentorship Impact</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">450+</div>
+                <div className="text-2xl font-bold text-gray-900">{profile.stats.studentsMentored}+</div>
                 <div className="text-xs text-gray-500 mt-1">Students Mentored</div>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">120</div>
+                <div className="text-2xl font-bold text-gray-900">{profile.stats.mockInterviews}</div>
                 <div className="text-xs text-gray-500 mt-1">Mock Interviews</div>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">85%</div>
+                <div className="text-2xl font-bold text-gray-900">{profile.stats.placementRate}%</div>
                 <div className="text-xs text-gray-500 mt-1">Placement Rate</div>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">4.9</div>
+                <div className="text-2xl font-bold text-gray-900">{profile.stats.rating}</div>
                 <div className="text-xs text-gray-500 mt-1">Rating (out of 5)</div>
               </div>
             </div>
@@ -187,17 +175,25 @@ export default function ProfilePage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wider">Recent Activity</h3>
             <div className="space-y-4">
-              {[
-                { title: `Completed Mock Interview with Aarav Patel`, time: "2 hours ago" },
-                { title: "Resolved doubt on System Design", time: "5 hours ago" },
-                { title: "Updated curriculum for Cloud Architecture", time: "1 day ago" },
-                { title: "Hosted group session on Dynamic Programming", time: "3 days ago" },
-              ].map((activity, i) => (
+              {profile.recentActivity.length === 0 && <p className="text-sm text-gray-500">No recent activity.</p>}
+              {profile.recentActivity.map((activity: any, i: number) => (
                 <div key={i} className="flex gap-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-xs text-gray-500">{activity.time}</p>
+                    <p className="text-xs text-gray-500">
+                      {activity.time ? (
+                        <>
+                          {(() => {
+                             try {
+                               return formatDistanceToNow(new Date(activity.time), { addSuffix: true });
+                             } catch(e) {
+                               return activity.time;
+                             }
+                          })()}
+                        </>
+                      ) : 'Unknown time'}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -220,52 +216,108 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
+            <form onSubmit={handleSave} className="flex flex-col">
+              <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Title / Designation</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Department</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Contact Email</label>
+                  <input 
+                    type="email" 
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Experience</label>
+                  <input 
+                    type="text" 
+                    value={formData.experience}
+                    placeholder="e.g. 12+ Years Experience"
+                    onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Campus</label>
+                  <input 
+                    type="text" 
+                    value={formData.campus}
+                    placeholder="e.g. Bangalore Campus"
+                    onChange={(e) => setFormData({ ...formData, campus: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Employee ID</label>
+                  <input 
+                    type="text" 
+                    value={formData.employeeId}
+                    onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Joined Date</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Aug 2021"
+                    value={formData.joined}
+                    onChange={(e) => setFormData({ ...formData, joined: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Expertise (Comma Separated)</label>
+                  <input 
+                    type="text" 
+                    value={formData.expertisesStr}
+                    placeholder="e.g. Data Structures, React, Node.js"
+                    onChange={(e) => setFormData({ ...formData, expertisesStr: e.target.value })}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Title / Designation</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Department</label>
-                <input 
-                  type="text" 
-                  required
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Contact Email</label>
-                <input 
-                  type="email" 
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 p-5 border-t border-gray-200 bg-gray-50">
                 <button 
                   type="button"
                   onClick={() => setEditModalOpen(false)}
