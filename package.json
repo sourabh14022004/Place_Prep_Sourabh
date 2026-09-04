@@ -9,6 +9,7 @@
     "dev": "npm run dev --workspace=student-portal & npm run dev --workspace=faculty-portal & npm run dev --workspace=admin-portal & wait"
   },
   "devDependencies": {
+    "@next/swc-darwin-arm64": "^16.3.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/uuid": "^10.0.0"
   },

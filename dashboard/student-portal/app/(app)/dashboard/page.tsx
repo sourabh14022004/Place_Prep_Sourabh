@@ -13,6 +13,7 @@ import { useDashboard, completeQuestion, fetcher, updateProfile } from "@/lib/ho
 import { getPracticeUrl, getPlatformInfo } from "@/lib/constants";
 import { CompanyLogo } from "@/components/ui";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
+import { CodingProfilesCompact } from "@/components/CodingProfiles";
 import { StatTile, ProgressRing, DifficultyDonut } from "@/components/Stats";
 
 function timeAgo(date: string | Date) {
@@ -343,6 +344,9 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Connected coding profiles — only platforms the user linked */}
+          <CodingProfilesCompact />
 
           {/* Difficulty split */}
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">

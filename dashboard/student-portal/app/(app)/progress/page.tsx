@@ -1,5 +1,5 @@
 "use client";
-import { CompanyLogo, PlatformLogo } from "@/components/ui";
+import { CompanyLogo } from "@/components/ui";
 import React, { useMemo, useState } from "react";
 import Link from "next/link"; // clickable company name links
 import { useRouter } from "next/navigation";
@@ -7,8 +7,9 @@ import {
   TrendingUp, Flame, Trophy, Zap, AlertCircle, Target, Dumbbell,
   BarChart3, Map as MapIcon, ChevronRight, Activity, Link2,
 } from "lucide-react";
-import { useProgress, useDashboard, useRoadmap, useCompanyTopics, usePracticeMyStats, useProfile, usePlatformProfiles } from "@/lib/hooks";
+import { useProgress, useDashboard, useRoadmap, useCompanyTopics, usePracticeMyStats, useProfile } from "@/lib/hooks";
 import ActivityHeatmap from "@/components/ActivityHeatmap";
+import { ConnectedProfileCards } from "@/components/CodingProfiles";
 import ErrorState from "@/components/ErrorState";
 import { FeatureGate } from "@/lib/features";
 import { StatTilesSkeleton, CardSkeleton } from "@/components/Skeletons";
@@ -33,41 +34,24 @@ function ProgressProfileSidebar({
   user: any;
   kpis: any;
 }) {
-  const { data: platformData } = usePlatformProfiles();
-
-  const handles: Record<string, string> = platformData?.handles ?? {};
-  const stats: Record<string, any> = platformData?.stats ?? {};
-
-  const name = user?.name || "Arjun Sharma";
-  const initials = user?.initials || (name ? name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() : "AS");
-  const role = user?.targetRole || user?.branch || "SQL Developer";
-  const rankCohort = kpis?.batchRank ? `#${kpis.batchRank} Cohort` : "#1 Cohort";
-  const points = (kpis?.xpTotal ?? user?.xp ?? 187).toLocaleString();
-  const trustScore = `${kpis?.prepScore ?? user?.prepScore ?? 77} / 100`;
-
-  // LeetCode stats
-  const lcHandle = handles?.leetcode || "Sourabhishere";
-  const lcStat = stats?.leetcode || {};
-  const lcSolved = lcStat.totalSolved ?? 953;
-  const lcEasy = lcStat.easy ?? 319;
-  const lcMed = lcStat.medium ?? 489;
-  const lcHard = lcStat.hard ?? 145;
-  const lcRank = lcStat.ranking ? `#${lcStat.ranking.toLocaleString()}` : "#39,431";
-
-  // Codeforces stats
-  const cfHandle = handles?.codeforces || "Sourabhisalsohere";
-  const cfStat = stats?.codeforces || {};
-  const cfRating = cfStat.rating ?? 0;
-  const cfMaxRating = cfStat.maxRating ?? 0;
-  const cfRank = cfStat.rank ?? "unrated";
-  const cfContests = cfStat.contestsCount ?? 0;
+  const name = user?.name || "—";
+  const initials =
+    user?.initials ||
+    (user?.name
+      ? user.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+      : "?");
+  const role = user?.targetRole || user?.branch || "—";
+  const rankCohort = kpis?.batchRank ? `#${kpis.batchRank} Cohort` : "—";
+  const points = (kpis?.xpTotal ?? user?.xp) != null ? (kpis?.xpTotal ?? user?.xp).toLocaleString() : "—";
+  const prepScore = kpis?.prepScore ?? user?.prepScore;
+  const trustScore = prepScore != null ? `${prepScore} / 100` : "—";
 
   return (
     <div className="space-y-4">
       {/* ── Your Profile Card ─────────────────────────────── */}
       <div className="bg-white border border-gray-200/90 rounded-2xl p-4 shadow-sm">
         <h3 className="text-sm font-bold text-gray-900 mb-3">Your Profile</h3>
-        
+
         {/* Avatar + Info Row */}
         <div className="flex items-center gap-3 mb-3.5">
           <div className="relative shrink-0">
@@ -105,7 +89,7 @@ function ProgressProfileSidebar({
         </div>
       </div>
 
-      {/* ── Coding Profiles Section ──────────────────────── */}
+      {/* ── Coding Profiles Section (only what the user connected) ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-bold text-gray-900">Coding Profiles</h3>
@@ -114,86 +98,7 @@ function ProgressProfileSidebar({
           </Link>
         </div>
 
-        {/* LeetCode Card */}
-        <div className="relative overflow-hidden bg-white border border-gray-200/90 rounded-2xl p-4 shadow-sm">
-          {/* Left orange accent bar */}
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500 rounded-l-2xl" />
-
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <PlatformLogo platform="leetcode" size={42} />
-              <div>
-                <h4 className="font-bold text-gray-900 text-sm">LeetCode</h4>
-                <p className="text-xs text-gray-400 font-medium">@{lcHandle}</p>
-              </div>
-            </div>
-
-            <div className="text-right">
-              <div className="text-sm font-bold text-gray-900">{lcRank}</div>
-              <div className="text-[9px] text-gray-400 uppercase font-medium">Rating</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-center pt-2.5 border-t border-gray-100 text-xs">
-            <div>
-              <div className="text-xs font-bold text-gray-900">{lcSolved}</div>
-              <div className="text-[9px] text-gray-400">Solved</div>
-            </div>
-            <div className="w-px h-5 bg-gray-200" />
-            <div>
-              <div className="text-xs font-bold text-emerald-600">{lcEasy}</div>
-              <div className="text-[9px] text-gray-400">Easy</div>
-            </div>
-            <div className="w-px h-5 bg-gray-200" />
-            <div>
-              <div className="text-xs font-bold text-blue-600">{lcMed}</div>
-              <div className="text-[9px] text-gray-400">Med</div>
-            </div>
-            <div className="w-px h-5 bg-gray-200" />
-            <div>
-              <div className="text-xs font-bold text-red-600">{lcHard}</div>
-              <div className="text-[9px] text-gray-400">Hard</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Codeforces Card */}
-        <div className="relative overflow-hidden bg-white border border-gray-200/90 rounded-2xl p-4 shadow-sm">
-          {/* Left blue accent bar */}
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600 rounded-l-2xl" />
-
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <PlatformLogo platform="codeforces" size={42} />
-              <div>
-                <h4 className="font-bold text-gray-900 text-sm">Codeforces</h4>
-                <p className="text-xs text-gray-400 font-medium">@{cfHandle}</p>
-              </div>
-            </div>
-
-            <div className="text-right">
-              <div className="text-sm font-bold text-gray-900">{cfRating}</div>
-              <div className="text-[9px] text-gray-400 uppercase font-medium">Rating</div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-center pt-2.5 border-t border-gray-100 text-xs">
-            <div>
-              <div className="text-xs font-bold text-gray-900">{cfMaxRating}</div>
-              <div className="text-[9px] text-gray-400">Max Rating</div>
-            </div>
-            <div className="w-px h-5 bg-gray-200" />
-            <div>
-              <div className="text-xs font-bold text-gray-800 capitalize">{cfRank}</div>
-              <div className="text-[9px] text-gray-400">Rank</div>
-            </div>
-            <div className="w-px h-5 bg-gray-200" />
-            <div>
-              <div className="text-xs font-bold text-gray-900">{cfContests}</div>
-              <div className="text-[9px] text-gray-400">Contests</div>
-            </div>
-          </div>
-        </div>
+        <ConnectedProfileCards />
 
         {/* Manage Connections Button */}
         <Link
