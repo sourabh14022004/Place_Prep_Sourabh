@@ -244,6 +244,55 @@ export function CompanyLogo({
   );
 }
 
+/**
+ * Overlapping company logos, for anything covering more than one company —
+ * a custom roadmap may span Adobe, Airbnb and Amazon at once, where the
+ * company cards elsewhere only ever show a single logo.
+ *
+ * Falls back to a neutral icon slot when a plan has no company questions at
+ * all (an entirely external/LeetCode roadmap), so the row keeps its rhythm.
+ */
+export function CompanyLogoStack({
+  names,
+  size = 28,
+  max = 3,
+  className = "",
+}: {
+  names: string[];
+  size?: number;
+  max?: number;
+  className?: string;
+}) {
+  const shown = names.slice(0, max);
+  const extra = names.length - shown.length;
+  // Overlap by ~a third so each logo stays recognisable.
+  const overlap = Math.round(size / 3);
+
+  return (
+    <div className={`flex items-center shrink-0 ${className}`}>
+      {shown.map((name, i) => (
+        <div
+          key={`${name}-${i}`}
+          className="rounded-xl ring-2 ring-white"
+          style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: shown.length - i }}
+          title={name}
+        >
+          <CompanyLogo name={name} size={size} />
+        </div>
+      ))}
+      {extra > 0 && (
+        <div
+          className="rounded-xl ring-2 ring-white bg-gray-100 border border-gray-200 flex items-center justify-center font-bold text-gray-600 shrink-0"
+          style={{ width: size, height: size, marginLeft: -overlap, fontSize: size * 0.34 }}
+          title={names.slice(max).join(", ")}
+        >
+          +{extra}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Official platform logos with pixel-perfect vector and crisp brand icons. */
 export function PlatformLogo({
   platform,

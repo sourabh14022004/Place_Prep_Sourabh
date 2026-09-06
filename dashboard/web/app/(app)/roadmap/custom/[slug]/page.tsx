@@ -20,6 +20,7 @@ import {
 import {
   followRoadmap, unfollowRoadmap, useCustomRoadmap,
 } from "@/lib/customRoadmaps";
+import { CompanyLogo, CompanyLogoStack } from "@/components/ui";
 
 export default function CustomRoadmapDetailPage({
   params,
@@ -103,9 +104,15 @@ export default function CustomRoadmapDetailPage({
       {/* ── Hero Header (mirrors the company curriculum hero) ── */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 shadow-sm">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="w-14 h-14 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
-            <Route className="w-6 h-6 text-blue-600" />
-          </div>
+          {roadmap.companyNames.length === 1 ? (
+            <CompanyLogo name={roadmap.companyNames[0]} size={56} />
+          ) : roadmap.companyNames.length > 1 ? (
+            <CompanyLogoStack names={roadmap.companyNames} size={48} max={4} />
+          ) : (
+            <div className="w-14 h-14 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
+              <Route className="w-6 h-6 text-blue-600" />
+            </div>
+          )}
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 truncate">{roadmap.title}</h1>
             <p className="text-gray-500 text-sm">

@@ -16,6 +16,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Loader2, Route } from "lucide-react";
+import { CompanyLogo, CompanyLogoStack } from "@/components/ui";
 import {
   followRoadmap, useCustomRoadmaps, type CustomRoadmapCard,
 } from "@/lib/customRoadmaps";
@@ -84,10 +85,19 @@ function CustomRoadmapCardView({
       }`}
       style={{ minWidth: 320 }}
     >
-      {/* Same tile frame the company cards use; a multi-company plan has no logo. */}
-      <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
-        <Route className="w-4 h-4 text-blue-600" />
-      </div>
+      {/* One company reuses the exact tile the company cards use; several are
+          stacked; none (an all-external plan) falls back to a neutral icon. */}
+      {r.companyNames.length === 1 ? (
+        <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
+          <CompanyLogo name={r.companyNames[0]} size={36} />
+        </div>
+      ) : r.companyNames.length > 1 ? (
+        <CompanyLogoStack names={r.companyNames} size={30} max={3} />
+      ) : (
+        <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
+          <Route className="w-4 h-4 text-blue-600" />
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
