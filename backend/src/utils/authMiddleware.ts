@@ -118,3 +118,16 @@ export async function requireAuth(
 export const requireStudent = (req: Request) => requireAuth(req, 'student');
 export const requireFaculty = (req: Request) => requireAuth(req, 'faculty');
 export const requireAdmin = (req: Request) => requireAuth(req, 'admin');
+
+/**
+ * Either staff role. Custom roadmaps are authored by faculty and admins alike,
+ * so their endpoints cannot use a single-role guard. Finer-grained rules — who
+ * may edit which roadmap — are the service's job, not this function's.
+ */
+export async function requireStaff(request: Request): Promise<AuthUser> {
+  const user = await requireAuth(request);
+  if (user.role !== 'faculty' && user.role !== 'admin') {
+    throw ApiError.forbidden('This resource requires faculty or admin access.');
+  }
+  return user;
+}

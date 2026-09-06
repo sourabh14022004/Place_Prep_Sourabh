@@ -36,9 +36,13 @@ export type QuestionType = typeof QUESTION_TYPES[number];
 
 export interface IQuestion extends Document {
   _id: mongoose.Types.ObjectId;
-  companyId: mongoose.Types.ObjectId; // ref: Company
-  companySlug: string; // denormalized for fast queries
-  companyName: string; // denormalized for display
+  // Company is optional: 2,282 of the 22,757 questions in production already
+  // have no company at all — the shared "generic pool" that roadmap.service
+  // draws aptitude, HR and system-design content from, and now also where
+  // externally-added questions (LeetCode etc.) live.
+  companyId?: mongoose.Types.ObjectId; // ref: Company
+  companySlug?: string; // denormalized for fast queries
+  companyName?: string; // denormalized for display
   roundType: RoundType;
   roundNumber?: number;
   problemSummary: string;
@@ -85,14 +89,17 @@ export interface IQuestion extends Document {
 
 const QuestionSchema = new Schema<IQuestion>(
   {
+    // NOT required — see the interface note above. These were declared
+    // required while 2,282 documents already lacked them (inserted by a bulk
+    // path that skips Mongoose validation), so loading one of those and
+    // calling .save() threw a spurious ValidationError.
     companyId: {
       type: Schema.Types.ObjectId,
       ref: 'Company',
-      required: true,
       index: true,
     },
-    companySlug: { type: String, required: true, index: true },
-    companyName: { type: String, required: true },
+    companySlug: { type: String, index: true },
+    companyName: { type: String },
     roundType: {
       type: String,
       enum: ['Coding', 'System Design', 'HR', 'Aptitude', 'LLD', 'Domain', 'Managerial'],

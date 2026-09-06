@@ -23,6 +23,9 @@ export { default as Topic } from './Topic';
 export { default as CurriculumTopic } from './CurriculumTopic';
 export { default as Skill } from './Skill';
 export { default as PlacementRecord } from './PlacementRecord';
+// --- Custom roadmaps (faculty/admin authored) ---
+export { default as CustomRoadmap } from './CustomRoadmap';
+export { default as CustomRoadmapFollow } from './CustomRoadmapFollow';
 
 // Re-export interfaces
 export type { IUser } from './User';
@@ -44,3 +47,6 @@ export type { ICurriculumTopic } from './CurriculumTopic';
 export type { ISkill } from './Skill';
 export type { IPlacementRecord } from './PlacementRecord';
 export type { QuestionType, QUESTION_TYPES } from './Question';
+// --- Custom roadmap interfaces ---
+export type { ICustomRoadmap, ICustomRoadmapWeek, CustomRoadmapStatus } from './CustomRoadmap';
+export type { ICustomRoadmapFollow } from './CustomRoadmapFollow';

@@ -40,18 +40,29 @@ const JWT_SECRET = new TextEncoder().encode(
 );
 
 /**
- * Which role owns this path, by URL prefix.
+ * Which roles may use this path, by URL prefix.
  *
  * /api is stripped first so an API route is governed by the same rule as the
  * page it backs: /api/admin/* is admin-owned exactly as /admin/* is. Without
  * the strip every /api/** path fell through to 'student', which let a student
  * token reach admin and faculty endpoints.
+ *
+ * Returns a list rather than a single role because /api/staff/* is shared by
+ * faculty and admin — custom roadmaps are authored by both, and duplicating
+ * those endpoints under two prefixes would mean two copies of every
+ * permission check.
  */
-function requiredRole(pathname: string): Role {
+function allowedRoles(pathname: string): Role[] {
   const p = pathname.startsWith('/api/') ? pathname.slice(4) : pathname;
-  if (p === '/faculty' || p.startsWith('/faculty/')) return 'faculty';
-  if (p === '/admin' || p.startsWith('/admin/')) return 'admin';
-  return 'student';
+  if (p === '/faculty' || p.startsWith('/faculty/')) return ['faculty'];
+  if (p === '/admin' || p.startsWith('/admin/')) return ['admin'];
+  if (p === '/staff' || p.startsWith('/staff/')) return ['faculty', 'admin'];
+  return ['student'];
+}
+
+/** Human-readable form of an allowed-role list, for error messages. */
+function describeRoles(roles: Role[]): string {
+  return roles.length === 1 ? roles[0] : roles.slice(0, -1).join(', ') + ' or ' + roles[roles.length - 1];
 }
 
 /** Landing page for a role that hit a path it doesn't own. */
@@ -120,13 +131,19 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return clearSession(deny('UNAUTHORIZED', 'Session expired. Please log in again.', 401));
   }
 
-  const needed = requiredRole(pathname);
-  if (role !== needed) {
+  const needed = allowedRoles(pathname);
+  if (!needed.includes(role as Role)) {
     // A valid session in the wrong section is not a broken session: send the
     // user to their own home instead of logging them out.
     return isApi
       ? NextResponse.json(
-          { success: false, error: { code: 'FORBIDDEN', message: `This resource requires ${needed} access.` } },
+          {
+            success: false,
+            error: {
+              code: 'FORBIDDEN',
+              message: `This resource requires ${describeRoles(needed)} access.`,
+            },
+          },
           { status: 403 }
         )
       : NextResponse.redirect(new URL(homeFor(role), request.url));
