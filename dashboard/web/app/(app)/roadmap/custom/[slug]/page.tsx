@@ -3,17 +3,19 @@
 /**
  * Student view of one faculty-authored roadmap.
  *
- * Read-only apart from follow/unfollow. Questions link to /practice/[id], the
- * same as the company roadmap curriculum does, so completion and XP stay in
- * one place rather than being reimplemented here.
+ * Mirrors the company curriculum view on /roadmap: same hero header, the same
+ * expandable week cards, and the same question rows — so moving between a
+ * company roadmap and a custom one feels like the same product. Read-only
+ * apart from follow/unfollow; questions link to /practice/[id] exactly as the
+ * company curriculum does, keeping completion and XP in one place.
  */
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Building2, CheckCircle, ExternalLink, Globe, Info,
-  Loader2, Users,
+  ArrowLeft, Building2, CheckCircle, ChevronDown, ExternalLink, Globe,
+  Info, Loader2, Play, Route, Users,
 } from "lucide-react";
 import {
   followRoadmap, unfollowRoadmap, useCustomRoadmap,
@@ -29,6 +31,17 @@ export default function CustomRoadmapDetailPage({
   const { data: roadmap, error, isLoading, mutate } = useCustomRoadmap(slug);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [expandedWeek, setExpandedWeek] = useState<number | null>(null);
+
+  // Open the first week that still has work left, so the page lands on
+  // something actionable instead of a wall of collapsed rows.
+  const defaultOpenWeek = useMemo(() => {
+    if (!roadmap) return null;
+    const next = roadmap.progress.weeks.find((w) => w.done < w.total);
+    return next?.weekNumber ?? roadmap.weeks[0]?.weekNumber ?? null;
+  }, [roadmap]);
+
+  const openWeek = expandedWeek ?? defaultOpenWeek;
 
   async function toggleFollow() {
     if (!roadmap) return;
@@ -47,26 +60,29 @@ export default function CustomRoadmapDetailPage({
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-4 h-8 w-48 animate-pulse rounded bg-gray-100" />
-        <div className="h-32 animate-pulse rounded-xl bg-gray-100" />
+      <div className="space-y-4">
+        <div className="h-8 bg-gray-100 rounded-lg w-48 animate-pulse" />
+        <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+        <div className="h-20 bg-gray-100 rounded-xl animate-pulse" />
       </div>
     );
   }
 
   if (error || !roadmap) {
     return (
-      <div className="mx-auto max-w-4xl py-16 text-center">
-        <Info className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-        <h1 className="text-lg font-bold text-gray-900">This roadmap isn&apos;t available</h1>
-        <p className="mx-auto mt-1 max-w-sm text-sm text-gray-500">
+      <div className="text-center py-16">
+        <div className="flex justify-center mb-3 text-gray-300">
+          <Info className="w-12 h-12" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-900 mb-2">This roadmap isn&apos;t available</h2>
+        <p className="text-gray-500 text-sm mb-6">
           It may have been unpublished, or the link may be wrong.
         </p>
         <Link
           href="/roadmap"
-          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to roadmaps
+          Back to My Roadmaps
         </Link>
       </div>
     );
@@ -76,165 +92,223 @@ export default function CustomRoadmapDetailPage({
   const done = new Set(roadmap.completedQuestionIds);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="pb-12">
       <Link
         href="/roadmap"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-800 mb-4"
       >
-        <ArrowLeft className="h-4 w-4" /> My Roadmaps
+        <ArrowLeft className="w-4 h-4" /> My Roadmaps
       </Link>
 
-      {/* ── header ── */}
-      <header className="rounded-xl border border-gray-200 bg-white p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* ── Hero Header (mirrors the company curriculum hero) ── */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 shadow-sm">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-14 h-14 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center shrink-0">
+            <Route className="w-6 h-6 text-blue-600" />
+          </div>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-900">{roadmap.title}</h1>
-              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                Custom
-              </span>
-            </div>
-            <p className="mt-0.5 text-sm text-gray-500">by {roadmap.createdByName}</p>
+            <h1 className="text-2xl font-bold text-gray-900 truncate">{roadmap.title}</h1>
+            <p className="text-gray-500 text-sm">
+              by {roadmap.createdByName} · {roadmap.weeks.length}-week plan
+            </p>
             {roadmap.description && (
-              <p className="mt-2 max-w-2xl text-sm text-gray-600">{roadmap.description}</p>
+              <p className="text-gray-500 text-sm mt-1">{roadmap.description}</p>
             )}
           </div>
-
-          <button
-            onClick={toggleFollow}
-            disabled={busy || (!roadmap.isFollowing && roadmap.isRetired)}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${
-              roadmap.isFollowing
-                ? "border border-gray-200 text-gray-700 hover:bg-gray-50"
-                : "bg-indigo-600 text-white hover:bg-indigo-700"
-            }`}
-          >
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {roadmap.isFollowing ? "Following" : "Follow this roadmap"}
-          </button>
         </div>
 
-        {actionError && <p className="mt-2 text-sm text-red-600">{actionError}</p>}
-
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-          {roadmap.companyNames.length > 0 && (
-            <span className="inline-flex min-w-0 items-center gap-1">
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-              <span className="truncate">{roadmap.companyNames.join(", ")}</span>
-            </span>
-          )}
-          {roadmap.followerCount > 0 && (
-            <span className="inline-flex items-center gap-1">
-              <Users className="h-3.5 w-3.5 text-gray-400" />
-              {roadmap.followerCount} following
-            </span>
-          )}
-        </div>
-
-        {/* Only meaningful once you're following — otherwise it always reads 0%. */}
-        {roadmap.isFollowing && (
-          <div className="mt-4">
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="font-medium text-gray-600">
-                {p.doneQuestions} of {p.totalQuestions} solved
-              </span>
-              <span className="font-bold text-indigo-700">{p.pctComplete}%</span>
+        <div className="flex flex-col md:flex-row items-end md:items-center gap-6 w-full md:w-auto">
+          {/* Only meaningful once following — otherwise it always reads 0%. */}
+          {roadmap.isFollowing && (
+            <div className="w-full md:w-64">
+              <div className="flex justify-between items-end mb-1.5">
+                <span className="text-2xl font-bold text-gray-900 leading-none">{p.pctComplete}%</span>
+                <span className="text-xs text-gray-500 font-medium">
+                  {p.doneQuestions}/{p.totalQuestions} solved
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${p.pctComplete}%` }}
+                />
+              </div>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-              <div className="h-2 rounded-full bg-indigo-600 transition-all" style={{ width: `${p.pctComplete}%` }} />
-            </div>
+          )}
+
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={toggleFollow}
+              disabled={busy || (!roadmap.isFollowing && roadmap.isRetired)}
+              className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm disabled:opacity-50 ${
+                roadmap.isFollowing
+                  ? "bg-white hover:bg-gray-50 border border-gray-200 text-gray-700"
+                  : "bg-gray-900 hover:bg-gray-800 text-white"
+              }`}
+            >
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+              {roadmap.isFollowing ? "Following" : "Follow"}
+            </button>
           </div>
-        )}
-      </header>
+        </div>
+      </div>
 
-      {roadmap.isRetired && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <span>
-            Your faculty has stopped offering this roadmap to new students. You can keep following
-            it and your progress is safe — but if you unfollow, you won&apos;t be able to rejoin.
-          </span>
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+          {actionError}
         </div>
       )}
 
-      {/* ── weeks ── */}
-      <div className="mt-6 space-y-5">
+      {/* ── Meta strip ── */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 mb-6">
+        {roadmap.companyNames.length > 0 && (
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            <Building2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span className="truncate">{roadmap.companyNames.join(", ")}</span>
+          </span>
+        )}
+        {roadmap.followerCount > 0 && (
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5 text-gray-400" />
+            {roadmap.followerCount} following
+          </span>
+        )}
+      </div>
+
+      {roadmap.isRetired && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+          <div className="bg-amber-100 text-amber-600 rounded-full p-1 mt-0.5 shrink-0">
+            <Info className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-amber-800 font-bold text-sm">No longer offered to new students</h3>
+            <p className="text-amber-700 text-xs mt-1 font-medium">
+              You can keep following this and your progress is safe. If you unfollow, you won&apos;t
+              be able to rejoin.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Weeks ── */}
+      <div className="space-y-4">
         {roadmap.weeks.map((week) => {
           const wp = p.weeks.find((x) => x.weekNumber === week.weekNumber);
+          const total = wp?.total ?? week.questions.length;
+          const doneCount = wp?.done ?? 0;
+          const pct = wp?.pct ?? 0;
+          const isComplete = total > 0 && doneCount === total;
+          const isExpanded = openWeek === week.weekNumber;
+
           return (
-            <section key={week.weekNumber}>
-              <div className="mb-2.5 flex items-center gap-2.5">
-                <span className="flex h-6 w-6 items-center justify-center rounded bg-gray-900 text-[11px] font-bold text-white">
-                  {week.weekNumber}
-                </span>
-                <h2 className="text-base font-semibold text-gray-900">{week.label}</h2>
-                {wp && (
-                  <span className="text-xs text-gray-500">
-                    {wp.done}/{wp.total}
-                    {wp.total > 0 && roadmap.isFollowing && (
-                      <span className="ml-1 font-semibold text-indigo-600">{wp.pct}%</span>
-                    )}
-                  </span>
-                )}
-              </div>
+            <div
+              key={week.weekNumber}
+              className={`border rounded-xl bg-white overflow-hidden transition-all ${
+                isExpanded ? "border-blue-200 shadow-sm" : "border-gray-200"
+              }`}
+            >
+              <div
+                className="p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                onClick={() => setExpandedWeek(isExpanded ? -1 : week.weekNumber)}
+              >
+                <div className="flex items-center gap-4 min-w-0">
+                  {isComplete ? (
+                    <CheckCircle className="w-6 h-6 text-green-500 shrink-0" />
+                  ) : (
+                    <Play className="w-6 h-6 text-blue-600 fill-blue-50 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${isComplete ? "text-gray-500" : "text-blue-600"}`}>
+                        WEEK {week.weekNumber}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-base text-gray-900 truncate">{week.label}</h3>
+                  </div>
+                </div>
 
-              <div className="space-y-2">
-                {week.questions.map((q) => {
-                  const isDone = done.has(q.id);
-                  // XP derived from difficulty, not q.xp: xpValue is stale in
-                  // many DB records, which is why the rest of the app derives
-                  // it too. Keeping the same rule avoids a roadmap showing +10
-                  // for a Hard question the dashboard shows as +50.
-                  const xp = q.difficulty === "Hard" ? 50 : q.difficulty === "Medium" ? 25 : 10;
-                  return (
-                    <div
-                      key={q.id}
-                      onClick={() => router.push(`/practice/${q.id}`)}
-                      className="group flex cursor-pointer flex-col justify-between gap-2 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:border-blue-300 sm:flex-row sm:items-center sm:gap-4"
-                    >
-                      <div className="flex min-w-0 items-start gap-3 sm:items-center">
-                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border sm:mt-0 ${isDone ? "border-green-500 bg-green-500" : "border-gray-300 bg-white"}`}>
-                          {isDone && <CheckCircle className="h-3.5 w-3.5 text-white" />}
-                        </div>
-                        <span className={`truncate text-sm font-semibold ${isDone ? "text-gray-400 line-through" : "text-gray-700 group-hover:text-blue-600"}`}>
-                          {q.title}
-                        </span>
-                      </div>
-
-                      <div className="ml-8 flex shrink-0 items-center gap-2.5 sm:ml-0">
-                        {q.isExternal ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-                            <Globe className="h-3 w-3" /> External
-                          </span>
-                        ) : q.companyName ? (
-                          <span className="hidden text-[11px] text-gray-400 sm:inline">{q.companyName}</span>
-                        ) : null}
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                          q.difficulty === "Easy" ? "border-green-200 bg-green-50 text-green-700"
-                          : q.difficulty === "Medium" ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : "border-red-200 bg-red-50 text-red-700"
-                        }`}>
-                          {q.difficulty}
-                        </span>
-                        <span className="text-xs font-bold text-orange-500">+{xp} XP</span>
-                        {q.practiceUrl && (
-                          <a
-                            href={q.practiceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Open ${q.title} in a new tab`}
-                            className="rounded-xl p-1 text-blue-500 transition-colors hover:bg-blue-50 hover:text-blue-700"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
+                <div className="flex items-center gap-6 shrink-0">
+                  <div className="text-right w-28 hidden sm:block">
+                    <div className="text-xs font-bold text-gray-700 mb-1">
+                      {doneCount}/{total}
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">{pct}% done</span>
+                      <div className="w-12 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-500 ${isComplete ? "bg-green-500" : "bg-blue-600"}`}
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                  <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                </div>
               </div>
-            </section>
+
+              {isExpanded && (
+                <div className="px-5 pb-5 space-y-3">
+                  {week.questions.length === 0 && (
+                    <p className="text-sm text-gray-400 text-center py-3">No questions in this week.</p>
+                  )}
+                  {week.questions.map((q) => {
+                    const isDone = done.has(q.id);
+                    // Derived from difficulty, not q.xp: xpValue is stale in many
+                    // records, and the rest of the app derives it the same way —
+                    // otherwise a Hard question reads +10 here and +50 elsewhere.
+                    const xp = q.difficulty === "Hard" ? 50 : q.difficulty === "Medium" ? 25 : 10;
+                    return (
+                      <div
+                        key={q.id}
+                        onClick={() => router.push(`/practice/${q.id}`)}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors cursor-pointer group gap-2 sm:gap-4"
+                      >
+                        <div className="flex items-start sm:items-center gap-3 min-w-0">
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${isDone ? "bg-green-500 border-green-500" : "border-gray-300 bg-white"}`}>
+                            {isDone && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                          </div>
+                          <span className={`font-semibold text-sm truncate ${isDone ? "text-gray-400 line-through" : "text-gray-700 group-hover:text-blue-600"}`}>
+                            {q.title}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0 ml-8 sm:ml-0">
+                          {q.isExternal ? (
+                            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">
+                              <Globe className="w-3 h-3" /> External
+                            </span>
+                          ) : q.companyName ? (
+                            <span className="hidden sm:inline text-[10px] text-gray-400 font-medium">{q.companyName}</span>
+                          ) : null}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            q.difficulty === "Easy" ? "bg-green-50 text-green-700 border-green-200"
+                            : q.difficulty === "Medium" ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-red-50 text-red-700 border-red-200"
+                          }`}>
+                            {q.difficulty}
+                          </span>
+                          <span className="text-xs font-bold text-orange-500 flex items-center gap-0.5">
+                            +{xp} XP
+                          </span>
+                          {q.practiceUrl && (
+                            <a
+                              href={q.practiceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Open ${q.title} in a new tab`}
+                              className="text-blue-500 hover:text-blue-700 p-1 rounded-xl hover:bg-blue-50 transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
