@@ -8,4 +8,7 @@
 **/.next
 *.env
 *.env.*
+# ...but the templates must be committed — they carry no secrets, only key names.
+!*.env.example
+!.env.example
 atlas-credentials.env

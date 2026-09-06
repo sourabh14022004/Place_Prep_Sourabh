@@ -1,8 +1,11 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2020"],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
@@ -17,15 +20,34 @@
     "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@models/*": ["src/models/*"],
-      "@services/*": ["src/services/*"],
-      "@repositories/*": ["src/repositories/*"],
-      "@utils/*": ["src/utils/*"],
-      "@validators/*": ["src/validators/*"],
-      "@config/*": ["src/config/*"],
-      "@types-app/*": ["src/types/*"]
+      "@models/*": [
+        "src/models/*"
+      ],
+      "@services/*": [
+        "src/services/*"
+      ],
+      "@repositories/*": [
+        "src/repositories/*"
+      ],
+      "@utils/*": [
+        "src/utils/*"
+      ],
+      "@validators/*": [
+        "src/validators/*"
+      ],
+      "@config/*": [
+        "src/config/*"
+      ],
+      "@types-app/*": [
+        "src/types/*"
+      ]
     }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

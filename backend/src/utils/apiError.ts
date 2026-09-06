@@ -4,7 +4,7 @@
  * Always returns: { success: false, error: { code, message, details? } }
  */
 
-import { NextResponse } from 'next/server';
+
 
 export class ApiError extends Error {
   public readonly statusCode: number;
@@ -51,9 +51,9 @@ export class ApiError extends Error {
  * Convert any error to a standard API error response.
  * Use this as the final catch in API route handlers.
  */
-export function handleApiError(error: unknown): NextResponse {
+export function handleApiError(error: unknown): Response {
   if (error instanceof ApiError) {
-    return NextResponse.json(
+    return Response.json(
       {
         success: false,
         error: {
@@ -66,10 +66,23 @@ export function handleApiError(error: unknown): NextResponse {
     );
   }
 
-  // Unexpected errors — don't leak internals to client, but DO log to Vercel
+  // A malformed JSON body is the caller's fault, not ours. request.json()
+  // throws a SyntaxError, which would otherwise fall through to a 500 and
+  // imply the server broke.
+  if (error instanceof SyntaxError && /JSON/i.test(error.message)) {
+    return Response.json(
+      {
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Request body is not valid JSON.' },
+      },
+      { status: 400 }
+    );
+  }
+
+  // Unexpected errors — don't leak internals to the client, but do log them.
   console.error('[UNHANDLED_API_ERROR]', error);
   const isDev = process.env.NODE_ENV !== 'production';
-  return NextResponse.json(
+  return Response.json(
     {
       success: false,
       error: {

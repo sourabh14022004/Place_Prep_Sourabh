@@ -11,16 +11,16 @@
  *   });
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+
 import { handleApiError } from './apiError';
 
 type RouteHandler = (
-  request: NextRequest,
+  request: Request,
   context?: { params: Record<string, string> }
-) => Promise<NextResponse>;
+) => Promise<Response>;
 
 export function asyncHandler(fn: RouteHandler): RouteHandler {
-  return async (request: NextRequest, context?: { params: Record<string, string> }) => {
+  return async (request: Request, context?: { params: Record<string, string> }) => {
     try {
       return await fn(request, context);
     } catch (error) {

@@ -6,11 +6,17 @@
     "dashboard/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=student-portal & npm run dev --workspace=faculty-portal & npm run dev --workspace=admin-portal & wait"
+    "dev": "concurrently -n api,web -c magenta,cyan --kill-others \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace=placeprep-backend",
+    "dev:web": "npm run dev --workspace=placeprep-web",
+    "build": "npm run build --workspace=placeprep-backend && npm run build --workspace=placeprep-web",
+    "typecheck": "npm run typecheck --workspace=placeprep-backend && npm run typecheck --workspace=placeprep-web"
   },
   "devDependencies": {
+    "@next/swc-darwin-arm64": "^16.3.4",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/uuid": "^10.0.0"
+    "@types/uuid": "^10.0.0",
+    "concurrently": "^9.1.2"
   },
   "dependencies": {
     "pino": "^10.3.1"

@@ -73,25 +73,15 @@ export const authService = {
       name = 'Administrator';
     }
 
-    // Redirect URL per role.
-    // Hardcoded production URLs as fallbacks — env vars override in local dev.
-    const studentUrl =
-      process.env.NEXT_PUBLIC_STUDENT_PORTAL_URL ||
-      'https://nst-prep-portal-by-pranay-student-p.vercel.app';
-    const facultyUrl =
-      process.env.NEXT_PUBLIC_FACULTY_PORTAL_URL ||
-      'https://nst-prep-portal-by-pranay-faculty-portal-aanchv5wk.vercel.app';
-    const adminUrl =
-      process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL ||
-      'https://nst-prep-portal-by-pranay-admin-portal-fpdq0kwf2.vercel.app';
-
-    const baseUrls: Record<string, string> = {
-      student: studentUrl,
-      faculty: facultyUrl,
-      admin:   adminUrl,
+    // Where this role lands after login. Single origin, so these are paths —
+    // they used to be absolute URLs of three separate portal deployments.
+    const ROLE_HOME: Record<string, string> = {
+      student: '/dashboard',
+      faculty: '/faculty',
+      admin:   '/admin/overview',
     };
 
-    const redirectUrl = baseUrls[user.role] || baseUrls.student;
+    const redirectUrl = ROLE_HOME[user.role] || ROLE_HOME.student;
 
     return {
       token,
