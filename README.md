@@ -1,35 +1,229 @@
-# NST Interview Prep Portal
+# PlacePrep — NST Interview Prep Portal
 
-A unified data-driven portal with two distinct use cases — helping NST students prepare for technical interviews at specific companies, and helping faculty align the B.Tech CS & AI curriculum with what industry actually tests and hires for.
+A data-driven portal with two use cases — helping NST students prepare for technical
+interviews at specific companies, and helping faculty align the B.Tech CS & AI
+curriculum with what industry actually tests for.
 
-## Live Deployments
-
-| Portal | URL |
-|--------|-----|
-| 🧑‍🎓 Student Portal | https://nst-prepportal-frontend.vercel.app/ |
-| 👨‍🏫 Faculty Portal | https://nst-prepportal-frontend-khaki.vercel.app/ |
-| 👨‍💼 Admin Portal | https://nst-prepportal-frontend-fs6o.vercel.app/ |
+Both are powered by the same dataset: interview questions, hiring patterns and skill
+requirements scraped and curated from public sources.
 
 ---
 
-## Project Overview
+## Current State
 
-Both use cases are powered by the same underlying data infrastructure: structured datasets about technical interview questions, hiring patterns, and in-demand skills scraped and curated from public sources.
+**Single Next.js app + a standalone Express API, sharing one MongoDB Atlas database.**
 
-### Use Case 1: Company-Specific Interview Prep Portal (Student-Facing)
+The three separate portal deployments the earlier version of this document described
+(student / faculty / admin, each its own Next.js app) were merged into one. They
+already shared a database, a JWT secret and a backend library, so the split bought no
+isolation while costing three dev servers, three dependency trees and a cross-origin
+auth handoff that passed the session token in a URL.
 
-An intelligent, structured guide that answers questions like:
-- What topics does Google typically test in its SDE interviews?
-- What is the typical interview format at a company like Amazon or Flipkart?
-- What LeetCode-style problem categories appear most frequently at a given company?
-- Are there common system design or behavioral questions for a particular role?
+```mermaid
+flowchart LR
+    B["Browser"] -->|"one origin"| W
 
-### Use Case 2: Curriculum Intelligence Dashboard (Faculty-Facing)
+    subgraph W["Next.js app · :3000 · dashboard/web"]
+        direction TB
+        R1["/ student"]
+        R2["/faculty/*"]
+        R3["/admin/*"]
+        MW["proxy.ts — role-aware auth"]
+    end
 
-An internally-facing tool for faculty and academic planners that answers:
-> *Are the skills we teach in our B.Tech CS & AI curriculum aligned with what companies actually test and hire for?*
+    W -->|"rewrites /api/*"| A
 
-Concretely, this means mapping structured interview data — topics, skills, problem types — against the existing course syllabus to produce a **gap analysis**: topics industry expects but aren't taught, and topics heavily covered that may have lower industry relevance.
+    subgraph A["Express API · :4000 · backend"]
+        direction TB
+        RT["routes/ — 106 endpoints"]
+        SV["services/ · repositories/"]
+    end
+
+    A --> DB[("MongoDB Atlas")]
+
+    style W fill:#172554,stroke:#3b82f6,color:#e2e8f0
+    style A fill:#14532d,stroke:#22c55e,color:#e2e8f0
+    style DB fill:#431407,stroke:#f97316,color:#e2e8f0
+```
+
+Next rewrites `/api/*` to the Express server, so the browser only ever sees one
+origin. Cookies stay same-origin and there is no CORS layer — deliberately, since
+adding one would recreate the problem the merge removed.
+
+| | |
+|---|---|
+| Frontend | Next.js 16 (App Router, Turbopack), React 19, Tailwind v4, SWR |
+| API | Express 5 on Node, TypeScript via `tsx` |
+| Database | MongoDB Atlas via Mongoose |
+| Auth | JWT in an HttpOnly cookie, verified in `proxy.ts` (edge) and per route |
+
+### Roles and URLs
+
+| Role | URL prefix | Pages |
+|---|---|---|
+| Student | `/` — `/dashboard`, `/practice`, `/roadmap`, … | 16 |
+| Faculty | `/faculty/*` | 14 |
+| Admin | `/admin/*` | 22 |
+
+`proxy.ts` maps each prefix to the roles allowed on it. `/api/staff/*` admits faculty
+**or** admin, for features both author.
+
+### Deployment
+
+The frontend is deployable to Vercel as before. **The Express API is not yet
+deployed** — Vercel cannot host a long-running process, so it needs a Node host
+(Render, Railway, Fly). `API_URL` is the only knob: point it at the deployed API and
+no code changes are needed. Until then the project runs locally.
+
+---
+
+## Getting Started
+
+```bash
+git clone git@github.com:sourabh14022004/Place_Prep_Sourabh.git
+cd Place_Prep_Sourabh
+npm install
+```
+
+Copy the env templates and fill them in:
+
+```bash
+cp backend/.env.example backend/.env.local
+cp dashboard/web/.env.example dashboard/web/.env.local
+```
+
+Both files document their own fields. Three things are easy to get wrong:
+
+- `MONGODB_URI` — special characters in the password must be percent-encoded (`@` becomes `%40`)
+- `JWT_SECRET` — minimum 32 characters, and **byte-identical in both files**; if they diverge every request 401s
+- `API_URL` (web) must match `API_PORT` (backend)
+
+Then:
+
+```bash
+npm run dev
+```
+
+That starts both processes under one command — the API on `:4000` and the web app on
+`:3000`. Open http://localhost:3000.
+
+| Command | Does |
+|---|---|
+| `npm run dev` | API + web together |
+| `npm run dev:api` / `npm run dev:web` | one at a time |
+| `npm run typecheck` | both workspaces |
+| `npm run build` | both workspaces |
+
+### If the database won't connect
+
+MongoDB Atlas rejects connections from IPs that aren't allowlisted, which is the
+usual cause when it breaks after switching networks. Add your current IP under
+Atlas → **Network Access**. The API starts and keeps serving even when the database
+is unreachable — `/health` reports `{"status":"degraded"}` and data routes return
+`503` — and reconnects on its own once access is restored, with no restart.
+
+---
+
+## Project Structure
+
+```
+Place_Prep_Sourabh/
+├── backend/                  Express API (workspace: placeprep-backend)
+│   └── src/
+│       ├── server.ts         entry — listen, graceful shutdown
+│       ├── app.ts            express app, shared Mongo pool
+│       ├── http/             Express ↔ Web Fetch adapter + filesystem router
+│       ├── routes/           106 endpoints, URL derived from directory path
+│       ├── services/         business logic (11)
+│       ├── repositories/     data access (12)
+│       ├── models/           Mongoose schemas (20)
+│       └── utils/            auth, errors, JWT, rate limiting
+│
+├── dashboard/web/            Next.js app (workspace: placeprep-web)
+│   ├── app/                  (app)/ student · faculty/ · admin/
+│   ├── components/           shared + student/, faculty/, admin/, staff/
+│   ├── lib/                  API clients and hooks
+│   └── proxy.ts              role-aware auth middleware
+│
+├── scrapers/  pipeline/  schema/  data/    data collection (see below)
+└── docs/
+```
+
+Routes are mounted by walking `backend/src/routes`, so a file's path *is* its URL —
+`routes/questions/[id]/complete/route.ts` serves `/api/questions/:id/complete`. There
+is no route manifest to drift out of sync.
+
+---
+
+## What's Built
+
+**Student** — company-specific roadmaps generated from that student's self-ratings
+(topics ordered by `frequency × weakness`), practice with MCQ support, progress
+analytics with an activity heatmap, XP and streaks, leaderboards, doubts to faculty,
+session booking, interview experience submissions.
+
+**Faculty** — doubt resolution, session requests, student matrix, company rankings,
+curriculum gap analysis, industry trends, report export.
+
+**Admin** — overview and analytics (engagement, doubts, practice, placement), student
+and faculty management, question moderation, company management, feature flags,
+notifications.
+
+**Custom roadmaps** *(faculty + admin)* — a multi-company plan authored by staff,
+with questions arranged into weeks by hand, external LeetCode-style questions, and
+publish / retire controls. Students discover and follow these from `/roadmap`.
+Followers are linked live, so an edit reaches them immediately; progress is derived
+by intersecting their completions with the roadmap's current question set, so
+removing a question never costs anyone credit.
+
+### Live data
+
+| Collection | Count |
+|---|---|
+| Questions | 22,759 *(2,284 with no company — the shared generic pool)* |
+| Companies | 676 |
+| User roadmaps | 22 |
+| Question completions | 373 |
+
+---
+
+## Use Cases
+
+### 1 · Company-Specific Interview Prep (student-facing)
+
+Answers questions like: what topics does Google test in SDE interviews? What is the
+interview format at Amazon or Flipkart? Which problem categories appear most often at
+a given company? Are there recurring system design or behavioural questions for a role?
+
+### 2 · Curriculum Intelligence (faculty-facing)
+
+> *Are the skills we teach in our B.Tech CS & AI curriculum aligned with what
+> companies actually test and hire for?*
+
+Maps structured interview data — topics, skills, problem types — against the course
+syllabus to produce a **gap analysis**: topics industry expects but we don't teach,
+and topics heavily covered that may have lower industry relevance.
+
+---
+
+## Data Collection
+
+`scrapers/`, `pipeline/`, `schema/` and `data/` hold the collection side. Each carries
+its own README; `pipeline/SOURCE-REGISTRY.md` tracks which sources have been worked.
+
+Current state here is narrower than the catalogue below suggests: one scraper group is
+implemented (`scrapers/group-a` — clone-and-parse, then promote-to-mongo), and
+`data/filtered-output/` holds the prepared datasets and an execution report. The
+remaining sources listed below are candidates, not completed integrations.
+
+### Fields captured
+
+- Company, role and level (SDE-1, SDE-2, Data Analyst, …)
+- Round type (coding, system design, HR, managerial, aptitude)
+- Topic / skill area (Dynamic Programming, OS, DBMS, ML, …)
+- Problem statement or summary, and difficulty
+- Source URL and collection date
+- Frequency signal — how often a topic or question recurs
 
 ---
 
@@ -113,151 +307,6 @@ Concretely, this means mapping structured interview data — topics, skills, pro
 | [ByteByByte](https://www.byte-by-byte.com) | Algorithm interview breakdowns with solutions |
 | [interviewing.io](https://interviewing.io) | Mock interview recordings and feedback (public blog posts) |
 | Company Engineering Blogs | Tech blogs from Google, Meta, Uber, etc. — insight into problem-solving culture |
-
-### Data Fields Captured
-
-- Company name and role/level (e.g., SDE-1, SDE-2, Data Analyst)
-- Interview round type (technical coding, system design, HR, managerial)
-- Topic/skill area (e.g., Dynamic Programming, OS, DBMS, Machine Learning)
-- Problem statement or question summary
-- Source URL and date of collection
-- Difficulty level (Easy / Medium / Hard, if available)
-- Frequency/recurrence signal (how often a topic/question appears)
-
----
-
-## Technical Pipeline
-
-```mermaid
-flowchart TD
-    subgraph SOURCES["Data Sources (35+)"]
-        S1[GeeksForGeeks]
-        S2[LeetCode Discuss]
-        S3[AmbitionBox]
-        S4[Glassdoor]
-        S5[InterviewBit]
-        S6[Coding Ninjas / PrepInsta]
-        S7[LinkedIn / Naukri]
-        S8[Reddit / Quora]
-        S9[GitHub Repos]
-    end
-
-    subgraph STAGE1["Week 1 — Source Discovery & Extraction"]
-        A1[/"Check ToS & robots.txt"/]
-        A2["Assess Scrapability
-Static HTML vs JS-rendered"]
-        A3["Build Scrapers & Parsers
-BeautifulSoup · Selenium · Playwright
-GraphQL APIs · REST APIs"]
-        A4[("Raw JSON Dumps
-per source")]
-    end
-
-    subgraph STAGE2["Week 2 — Ingestion & Schema"]
-        B1["Schema Design
-companies · roles · topics
-questions · question_topics"]
-        B2["Supabase / PostgreSQL
-Migrations & Setup"]
-        B3["ETL Pipeline
-Parse JSON → Load to DB
-Deduplication"]
-    end
-
-    subgraph STAGE3["Week 3 — Cleaning & Classification"]
-        C1["Data Cleaning
-Normalize company names
-Fix encoding · Remove HTML"]
-        C2["Claude API Classification
-Tag: topic · difficulty
-round type · skill area"]
-        C3["Syllabus Mapping
-Map topics → B.Tech CS & AI
-course categories"]
-    end
-
-    subgraph STAGE4["Week 4 — Student Portal"]
-        D1["FastAPI Backend
-/companies · /topics · /questions"]
-        D2["Next.js Frontend
-Search · Filter · Cards"]
-        D3[["Deployed on Vercel
-Student Interview Prep Portal"]]
-    end
-
-    subgraph STAGE5["Week 5 — Faculty Dashboard"]
-        E1["Gap Analysis Logic
-Industry topics vs Syllabus topics"]
-        E2["Recharts / Chart.js
-Heatmaps · Bar charts"]
-        E3["Supabase Auth
-Faculty-only access"]
-        E4[["Curriculum Intelligence
-Dashboard"]]
-    end
-
-    SOURCES --> A1
-    A1 --> A2
-    A2 --> A3
-    A3 --> A4
-    A4 --> B1
-    B1 --> B2
-    B2 --> B3
-    B3 --> C1
-    C1 --> C2
-    C2 --> C3
-    C3 --> D1
-    C3 --> E1
-    D1 --> D2
-    D2 --> D3
-    E1 --> E2
-    E2 --> E3
-    E3 --> E4
-
-    style SOURCES fill:#1e293b,stroke:#475569,color:#e2e8f0
-    style STAGE1 fill:#172554,stroke:#3b82f6,color:#e2e8f0
-    style STAGE2 fill:#14532d,stroke:#22c55e,color:#e2e8f0
-    style STAGE3 fill:#431407,stroke:#f97316,color:#e2e8f0
-    style STAGE4 fill:#4a1d96,stroke:#a855f7,color:#e2e8f0
-    style STAGE5 fill:#7f1d1d,stroke:#ef4444,color:#e2e8f0
-```
-
-| Stage | Description | Status |
-|-------|-------------|--------|
-| 1. Source Discovery | Identify relevant websites, assess scrapability, check ToS and robots.txt | Week 1 |
-| 2. Data Extraction | Build scrapers/parsers, extract raw HTML/JSON data | Week 1 |
-| 3. Ingestion Pipeline | Load raw data into a staging area (files/database) | Week 2 |
-| 4. Schema Design | Define structured schema for normalized interview data | Week 2 |
-| 5. Data Transformation | Clean, normalize, and structure raw data | Week 2–3 |
-| 6. Classification & Tagging | Tag by topic/company/role/difficulty; map to course syllabus | TBD |
-| 7. Product Layer | Build views/dashboards for Use Case 1 and Use Case 2 | TBD |
-
----
-
-## Repository Structure
-
-```
-NST-Interview-Prep-Portal/
-├── scrapers/          # Source-specific scrapers and parsers
-├── data/              # Raw and processed data
-├── pipeline/          # Ingestion and transformation scripts
-├── schema/            # Schema definitions
-├── dashboard/         # Product layer — student and faculty views
-└── docs/              # Documentation and analysis
-```
-
----
-
-## Getting Started
-
-```bash
-git clone https://github.com/edusatyaki/NST-Interview-Prep-Portal.git
-cd NST-Interview-Prep-Portal
-```
-
-More setup instructions will be added as the project develops.
-
----
 
 ## Contributing a Data Source
 
