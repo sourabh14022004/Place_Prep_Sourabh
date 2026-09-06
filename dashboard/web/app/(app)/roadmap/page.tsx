@@ -24,6 +24,8 @@ import { usePageTitle } from "@/lib/use-page-title";
 
 
 // ─── Compact Active Roadmap Card ────────────────────────────────────────────
+import CustomRoadmapSection from "@/components/CustomRoadmapSection";
+
 function ActiveRoadmapCard({
   company,
   isSelected,
@@ -246,21 +248,28 @@ function RoadmapContent() {
   }
 
   if (!activeCompany || companies.length === 0) {
+    // This early return used to end the page. A student following a faculty
+    // roadmap but no company roadmap would be told they had nothing — so the
+    // custom section renders here too (it returns null when there are none).
     return (
-      <div className="text-center py-16">
-        <div className="flex justify-center mb-3 text-gray-300">
-          <ClipboardList className="w-12 h-12" />
+      <div>
+        <div className="text-center py-16">
+          <div className="flex justify-center mb-3 text-gray-300">
+            <ClipboardList className="w-12 h-12" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">No companies in your roadmap yet</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Go to the Companies page and click &quot;Add to Roadmap&quot;
+          </p>
+          <Link
+            href="/companies"
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Browse Companies
+          </Link>
         </div>
-        <h2 className="text-lg font-bold text-gray-900 mb-2">No companies in your roadmap yet</h2>
-        <p className="text-gray-500 text-sm mb-6">
-          Go to the Companies page and click &quot;Add to Roadmap&quot;
-        </p>
-        <Link
-          href="/companies"
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
-        >
-          Browse Companies
-        </Link>
+
+        <CustomRoadmapSection />
       </div>
     );
   }
@@ -328,6 +337,9 @@ function RoadmapContent() {
           )}
         </div>
       </section>
+
+      {/* ── Custom roadmaps published by faculty ── */}
+      <CustomRoadmapSection />
 
       {/* ── Active Roadmap Detail View ── */}
       <div id="roadmap-curriculum">
