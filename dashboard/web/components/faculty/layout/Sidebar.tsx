@@ -12,8 +12,7 @@ import {
   LayoutList,
   Trophy,
   BookOpen,
-  TrendingUp,
-} from "lucide-react";
+  TrendingUp, Route } from "lucide-react";
 import { cn } from "@/lib/faculty/utils";
 import { useFeatures } from "@/lib/faculty/use-features";
 
@@ -28,6 +27,7 @@ const navigation = [
   { name: "Student Matrix", href: "/faculty/students", icon: LayoutList, feature: "faculty.students" },
   { name: "Leaderboard", href: "/faculty/leaderboard", icon: Trophy, feature: "faculty.leaderboard" },
   { name: "Company Rankings", href: "/faculty/rankings", icon: Building2, feature: "faculty.rankings" },
+  { name: "Custom Roadmaps", href: "/faculty/custom-roadmaps", icon: Route },
   { name: "Curriculum Gap", href: "/faculty/curriculum", icon: BookOpen, feature: "faculty.curriculum" },
   { name: "Industry Trends", href: "/faculty/trends", icon: TrendingUp, feature: "faculty.trends" },
   { name: "Export Reports", href: "/faculty/reports", icon: Send, feature: "faculty.reports" },

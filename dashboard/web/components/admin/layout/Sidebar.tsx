@@ -7,8 +7,7 @@ import {
   Bell, HelpCircle, Calendar, FileText, LogOut,
   Activity, MessageSquare, Dumbbell, Briefcase,
   Trophy, BookCopy, ClipboardList, Building2,
-  SlidersHorizontal,
-} from "lucide-react";
+  SlidersHorizontal, Route } from "lucide-react";
 
 const navGroups = [
   {
@@ -29,6 +28,7 @@ const navGroups = [
     label: "Content",
     items: [
       { name: "Questions", href: "/admin/questions", icon: ClipboardList },
+      { name: "Custom Roadmaps", href: "/admin/custom-roadmaps", icon: Route },
       { name: "Companies", href: "/admin/companies", icon: Building2 },
     ],
   },
