@@ -20,11 +20,9 @@ export const env = {
     secret: requireEnv('JWT_SECRET'),
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
-  portals: {
-    student: process.env.STUDENT_PORTAL_URL || 'http://localhost:3000',
-    faculty: process.env.FACULTY_PORTAL_URL || 'http://localhost:3001',
-    admin: process.env.ADMIN_PORTAL_URL || 'http://localhost:3002',
-  },
+  // One origin since the portals merged; roles are paths under it, not hosts.
+  siteUrl: process.env.SITE_URL || 'http://localhost:3000',
+  apiPort: Number(process.env.API_PORT) || 4000,
   email: {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT) || 587,

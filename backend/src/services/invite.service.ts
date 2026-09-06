@@ -19,12 +19,25 @@ import { hashPassword } from '../utils/password';
 import { ApiError } from '../utils/apiError';
 import mongoose from 'mongoose';
 
+/**
+ * Public base URL of the app, for links sent to humans.
+ *
+ * These used to point at the standalone faculty portal via
+ * NEXT_PUBLIC_FACULTY_URL. That deployment no longer exists — the invite page
+ * is now /invite/[token] on the merged app — so an invite built the old way
+ * would have linked to a dead site.
+ */
+function siteUrl(): string {
+  return process.env.SITE_URL || 'http://localhost:3000';
+}
+
+
 const INVITE_EXPIRY_DAYS = 7;
 
 export const inviteService = {
   /**
    * Admin creates a new faculty invite.
-   * Returns the invite token and a sharable URL (built from NEXT_PUBLIC_FACULTY_URL env).
+   * Returns the invite token and a sharable URL (built from SITE_URL env).
    */
   async createInvite(data: {
     email: string;
@@ -47,11 +60,9 @@ export const inviteService = {
 
     if (existing) {
       // Return the existing invite URL instead of creating a duplicate
-      const facultyBaseUrl =
-        process.env.NEXT_PUBLIC_FACULTY_URL || 'https://nst-prep-portal-by-pranay-faculty-p-ten.vercel.app';
       return {
         invite: existing,
-        inviteUrl: `${facultyBaseUrl}/invite/${existing.token}`,
+        inviteUrl: `${siteUrl()}/invite/${existing.token}`,
         isExisting: true,
       };
     }
@@ -69,12 +80,9 @@ export const inviteService = {
       tokenExpiresAt,
     });
 
-    const facultyBaseUrl =
-      process.env.NEXT_PUBLIC_FACULTY_URL || 'https://nst-prep-portal-by-pranay-faculty-p-ten.vercel.app';
-
     return {
       invite,
-      inviteUrl: `${facultyBaseUrl}/invite/${token}`,
+      inviteUrl: `${siteUrl()}/invite/${token}`,
       isExisting: false,
     };
   },
