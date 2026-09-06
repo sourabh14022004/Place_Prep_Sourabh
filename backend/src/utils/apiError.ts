@@ -66,6 +66,30 @@ export function handleApiError(error: unknown): Response {
     );
   }
 
+  // The database being unreachable is not a bug in this request — it is a
+  // dependency outage. 503 tells the caller to retry rather than implying the
+  // API is broken, and it matches what /health reports at the same moment.
+  // Common cause in this project: the current IP is missing from the Atlas
+  // Network Access list after switching networks.
+  const name = (error as { name?: string } | null)?.name ?? '';
+  if (
+    name === 'MongooseServerSelectionError' ||
+    name === 'MongoNetworkError' ||
+    name === 'MongoNotConnectedError'
+  ) {
+    console.error('[DB_UNAVAILABLE]', error);
+    return Response.json(
+      {
+        success: false,
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'The database is temporarily unreachable. Please try again shortly.',
+        },
+      },
+      { status: 503 }
+    );
+  }
+
   // A malformed JSON body is the caller's fault, not ours. request.json()
   // throws a SyntaxError, which would otherwise fall through to a 500 and
   // imply the server broke.

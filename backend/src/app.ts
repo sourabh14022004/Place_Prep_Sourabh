@@ -9,6 +9,7 @@
  */
 
 import express, { type ErrorRequestHandler } from 'express';
+import mongoose from 'mongoose';
 import { join } from 'node:path';
 import connectDB from './config/db';
 import { buildRouter } from './http/fsRouter';
@@ -26,13 +27,35 @@ export async function createApp() {
 
   // Liveness probe — no DB dependency, so it answers even when Mongo is down.
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime() });
+    // 1 = connected, 2 = connecting; anything else means queries will fail.
+    const readyState = mongoose.connection.readyState;
+    const dbUp = readyState === 1;
+    res.status(dbUp ? 200 : 503).json({
+      status: dbUp ? 'ok' : 'degraded',
+      db: ['disconnected', 'connected', 'connecting', 'disconnecting'][readyState] ?? 'unknown',
+      uptime: process.uptime(),
+    });
   });
 
-  // One shared connection pool for the whole process. Under Next on serverless
-  // every lambda opened its own; three deployments x maxPoolSize 50 could reach
-  // 150 connections against a single cluster.
-  await connectDB();
+  // Warm the shared pool at boot, but do not make it a condition of starting.
+  //
+  // This used to be a bare `await connectDB()`, so an unreachable database took
+  // the whole API process down — and because tsx watch survives its child,
+  // concurrently's --kill-others never fired and the web server kept proxying
+  // into a closed port, burying the real cause under thousands of ECONNREFUSED
+  // dumps. Every route calls connectDB() itself and db.ts clears its cached
+  // promise on failure, so a later request reconnects on its own once the
+  // database is reachable again.
+  try {
+    await connectDB();
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : err },
+      'Could not reach MongoDB at startup — the API is running but every ' +
+        'database-backed route will return 503 until it connects. If this is ' +
+        'Atlas, the usual cause is that your current IP is not in Network Access.'
+    );
+  }
 
   app.use('/api', await buildRouter(join(__dirname, 'routes')));
 
