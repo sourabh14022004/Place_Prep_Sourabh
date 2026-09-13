@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { X, Calendar, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { addRoadmapCompany } from "@/lib/hooks";
-import { TARGET_ROLES } from "placeprep-backend/src/constants/roles";
+import { TARGET_ROLES } from "@/lib/constants";
 
 interface ApiTopic {
   topicSlug: string;

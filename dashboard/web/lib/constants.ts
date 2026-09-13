@@ -144,4 +144,10 @@ export function getPlatformInfo(url: string | null | undefined): { name: string;
   }
 }
 
+export const TARGET_ROLES = [
+  'SDE-1', 'SDE-2', 'SDE-3',
+  'Data Analyst', 'Product Manager',
+  'DevOps', 'ML Engineer', 'QA',
+] as const;
 
+export type TargetRole = typeof TARGET_ROLES[number];

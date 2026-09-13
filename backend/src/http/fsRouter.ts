@@ -71,7 +71,7 @@ export async function buildRouter(routesRoot: string): Promise<Router> {
 
   let mounted = 0;
   for (const { file, path } of entries) {
-    const mod = (await import(pathToFileURL(file).href)) as Record<string, unknown>;
+    const mod = (await import(file)) as Record<string, unknown>;
     for (const method of METHODS) {
       const handler = mod[method];
       if (typeof handler !== 'function') continue;

@@ -130,7 +130,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     // Today's DAU — count unique users active today using User.lastSeenAt
-    const { default: User } = await import('placeprep-backend/src/models/User');
+    const { default: User } = await import('../../../../models/User');
     const [todayActiveStudents, todayActiveFaculty] = await Promise.all([
       User.countDocuments({ role: 'student', lastSeenAt: { $gte: todayStart } }),
       User.countDocuments({ role: 'faculty', lastSeenAt: { $gte: todayStart } }),

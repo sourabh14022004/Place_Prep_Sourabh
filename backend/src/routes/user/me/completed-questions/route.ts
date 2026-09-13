@@ -18,7 +18,7 @@ import connectDB from '../../../../config/db';
 import { requireStudent } from '../../../../utils/authMiddleware';
 // QuestionCompletion uses `export default` (not named export) — import accordingly
 import QuestionCompletion from '../../../../models/QuestionCompletion';
-import 'placeprep-backend/src/models/Question'; // Ensure Question model is registered before querying
+import '../../../../models/Question'; // Ensure Question model is registered before querying
 import { isValidObjectId, toObjectId } from '../../../../utils/objectid';
 import { successResponse } from '../../../../utils/apiResponse';
 import { handleApiError } from '../../../../utils/apiError';

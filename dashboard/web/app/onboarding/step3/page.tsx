@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowLeft, Info, Loader2, Sprout, Gauge, Rocket } from "lucide-react";
 import Stepper from "@/components/onboarding/Stepper";
-import { TARGET_ROLES } from "placeprep-backend/src/constants/roles";
+import { TARGET_ROLES } from "@/lib/constants";
 
 interface ApiTopic {
   topicSlug: string;

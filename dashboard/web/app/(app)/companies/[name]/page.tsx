@@ -14,7 +14,7 @@ import {
   Legend, CartesianGrid,
 } from "recharts";
 import { useCompany } from "@/lib/hooks";
-import { TARGET_ROLES } from "placeprep-backend/src/constants/roles";
+import { TARGET_ROLES } from "@/lib/constants";
 import ErrorState from "@/components/ErrorState";
 
 interface RoundGroup {

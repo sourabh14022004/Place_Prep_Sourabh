@@ -20,12 +20,7 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "placeprep-backend/*": ["../../backend/*"],
-      "zod": ["../../backend/node_modules/zod"],
-      "zod/*": ["../../backend/node_modules/zod/*"],
-      "next": ["./node_modules/next"],
-      "next/*": ["./node_modules/next/*"]
+      "@/*": ["./*"]
     }
   },
   "include": [

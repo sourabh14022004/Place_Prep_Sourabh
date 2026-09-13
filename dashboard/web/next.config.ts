@@ -16,13 +16,6 @@ import type { NextConfig } from "next";
 const API_URL = process.env.API_URL || "http://localhost:4000";
 
 const nextConfig: NextConfig = {
-  // The web app no longer imports backend *logic* — that all moved to the
-  // Express server. It still imports pure shared domain constants (e.g.
-  // constants/roles), which carry no mongoose or framework dependency.
-  experimental: {
-    externalDir: true,
-  },
-  transpilePackages: ["placeprep-backend"],
   // ── Security headers ─────────────────────────────────────────────────
   // Baseline hardening applied to every response. HSTS is handled by the host.
   async headers() {
