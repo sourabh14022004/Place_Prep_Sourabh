@@ -13,10 +13,12 @@
     "typecheck": "npm run typecheck --workspace=placeprep-backend && npm run typecheck --workspace=placeprep-web"
   },
   "devDependencies": {
-    "@next/swc-darwin-arm64": "^16.3.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/uuid": "^10.0.0",
     "concurrently": "^9.1.2"
+  },
+  "optionalDependencies": {
+    "@next/swc-darwin-arm64": "^16.3.4"
   },
   "dependencies": {
     "pino": "^10.3.1"
