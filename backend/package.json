@@ -10,6 +10,7 @@
   "scripts": {
     "seed": "ts-node --project tsconfig.json src/scripts/seed.ts",
     "seed:reset": "ts-node --project tsconfig.json src/scripts/seed.ts --reset",
+    "seed:real": "node scripts/seedRealData.js",
     "backfill:domains": "ts-node --project tsconfig.json src/scripts/backfill-doubt-domains.ts",
     "backfill:domains:write": "ts-node --project tsconfig.json src/scripts/backfill-doubt-domains.ts --write",
     "typecheck": "tsc --noEmit",

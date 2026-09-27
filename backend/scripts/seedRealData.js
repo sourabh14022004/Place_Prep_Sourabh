@@ -23,18 +23,27 @@
 'use strict';
 
 const path = require('path');
-// Resolve modules correctly — mongoose is in root node_modules, dotenv in backend/node_modules
-const ROOT_MODULES = path.join(__dirname, '../../node_modules');
-const BACKEND_MODULES = path.join(__dirname, '../node_modules');
-const mongoose = require(path.join(ROOT_MODULES, 'mongoose'));
-const dotenv = require(path.join(BACKEND_MODULES, 'dotenv'));
 
-// Load env from backend/.env
+let mongoose, dotenv;
+try {
+  mongoose = require('mongoose');
+} catch (e) {
+  mongoose = require(path.join(__dirname, '../../node_modules/mongoose'));
+}
+
+try {
+  dotenv = require('dotenv');
+} catch (e) {
+  dotenv = require(path.join(__dirname, '../../node_modules/dotenv'));
+}
+
+// Load env from backend/.env.local or backend/.env
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
-  console.error('❌  MONGODB_URI not found in backend/.env');
+  console.error('❌  MONGODB_URI not found in backend/.env or backend/.env.local');
   process.exit(1);
 }
 
@@ -235,7 +244,7 @@ const QuestionSchema = new mongoose.Schema({
   frequencyScore: { type: Number, default: 0 },
   xpValue: { type: Number, default: 10 },
   isHot: { type: Boolean, default: false },
-  verified: { type: Boolean, default: false },
+  verified: { type: Boolean, default: true },
   isSeeded: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
 }, { collection: 'questions', _id: false });
@@ -407,7 +416,7 @@ async function main() {
       frequencyScore: freq,
       xpValue: calcXpValue(q.difficulty, freq),
       isHot: freq > hotThreshold,
-      verified: q.verified || false,
+      verified: true,
       isSeeded: true,
       createdAt: new Date(q.createdAt || Date.now()),
     };

@@ -74,6 +74,7 @@ function QuizModal({
   alreadySolved: boolean;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [picked, setPicked] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(alreadySolved);
   const [completing, setCompleting] = useState(false);
@@ -104,9 +105,22 @@ function QuizModal({
   const handleComplete = async () => {
     setCompleting(true);
     try {
-      await completeQuestion(question.id);
+      const result: any = await completeQuestion(question.id);
       setSolved(true);
-      toast.success("Marked as completed — progress updated.");
+      if (result?.unlinkedPlatform) {
+        toast.success("Marked as completed (Self-marked)", {
+          description: `Connect your ${result.unlinkedPlatform} profile in Profile settings to auto-verify your solves and showcase your profile for placement prep!`,
+          action: {
+            label: "Connect Profile",
+            onClick: () => router.push("/profile"),
+          },
+          duration: 6000,
+        });
+      } else if (result?.verifiedViaPlatform) {
+        toast.success(`Marked as completed — verified via ${result.platformName || 'LeetCode'} ✓`, { duration: 3000 });
+      } else {
+        toast.success("Marked as completed — progress updated.");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not mark as completed.");
     } finally {

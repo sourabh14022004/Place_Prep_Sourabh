@@ -105,7 +105,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
     if (isSolved) return;
     setCompleting(true);
     try {
-      await completeQuestion(qId);
+      const result: any = await completeQuestion(qId);
       await mutateCompleted();
       await Promise.all([
         globalMutate("/api/dashboard"),
@@ -113,7 +113,20 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
         globalMutate("/api/user/me/roadmap"),
         globalMutate("/api/user/me"),
       ]);
-      toast.success(`+${xp} XP earned!`);
+      if (result?.unlinkedPlatform) {
+        toast.success(`+${xp} XP earned! (Self-marked)`, {
+          description: `Connect your ${result.unlinkedPlatform} account in Profile settings to auto-verify your solves and showcase your profile for placement prep!`,
+          action: {
+            label: "Connect Profile",
+            onClick: () => router.push("/profile"),
+          },
+          duration: 6000,
+        });
+      } else if (result?.verifiedViaPlatform) {
+        toast.success(`+${xp} XP earned! Verified via ${result.platformName || 'LeetCode'} ✓`, { duration: 3000 });
+      } else {
+        toast.success(`+${xp} XP earned!`);
+      }
     } catch (err: any) {
       const msg = err?.message ?? "Failed to mark done.";
       if (msg.includes("Link your") || msg.includes("platform profile") || msg.includes("handle")) {

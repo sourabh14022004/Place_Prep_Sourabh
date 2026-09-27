@@ -38,8 +38,6 @@ function ActiveRoadmapCard({
   onRemove?: (slug: string) => void;
 }) {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-    // BUG-R8 FIX: Was using w.questions.length (always 0 — API returns counts not arrays)
-  // Now correctly uses totalQuestions/doneQuestions from the week object
   const totalQ = company.weeks.reduce((s, w) => s + (w.totalQuestions ?? 0), 0);
   const doneQ  = company.weeks.reduce((s, w) => s + (w.doneQuestions ?? 0), 0);
   const pct = totalQ > 0 ? Math.round((doneQ / totalQ) * 100) : 0;
@@ -49,56 +47,64 @@ function ActiveRoadmapCard({
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-4 px-4 py-3 bg-white border rounded-xl cursor-pointer transition-all duration-150 shrink-0 ${
+      className={`flex flex-col justify-between p-4 bg-white border rounded-2xl cursor-pointer transition-all duration-150 shrink-0 w-[275px] ${
         isSelected
-          ? "border-blue-500 ring-2 ring-blue-100 shadow-sm"
-          : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+          ? "border-blue-500 ring-2 ring-blue-100 bg-blue-50/20 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+          : "border-gray-200 hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5"
       }`}
-      style={{ minWidth: 260 }}
     >
-      {/* Logo */}
-      <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
-        <CompanyLogo name={company.name} size={36} />
+      {/* Top: Logo + Name + Delete action */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <CompanyLogo name={company.name} size={42} className="shrink-0" />
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-gray-900 truncate leading-snug">{company.name}</h3>
+            <p className="text-xs text-gray-500 font-medium">Week {company.currentWeek} of {company.totalWeeks}</p>
+          </div>
+        </div>
+
+        {isConfirmingDelete ? (
+          <div className="flex items-center gap-1 shrink-0 bg-red-50 p-1 rounded-lg border border-red-100">
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove?.(company.slug); }}
+              className="text-[11px] bg-red-600 text-white px-2 py-0.5 rounded font-bold hover:bg-red-700 transition-colors"
+            >
+              Del
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(false); }}
+              className="text-[11px] bg-white text-gray-600 px-1.5 py-0.5 rounded font-medium hover:bg-gray-100 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(true); }}
+            className="text-gray-300 hover:text-red-500 p-1 rounded-lg hover:bg-gray-50 transition-colors shrink-0"
+            aria-label="Remove"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-bold text-gray-900 truncate">{company.name}</span>
-          {isConfirmingDelete ? (
-            <div className="flex items-center gap-2 ml-2 shrink-0">
-              <span className="text-[10px] text-red-500 font-medium">Remove?</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onRemove?.(company.slug); }}
-                className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded hover:bg-red-100 transition-colors font-semibold"
-              >
-                Yes
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(false); }}
-                className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded hover:bg-gray-200 transition-colors font-semibold"
-              >
-                No
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(true); }}
-              className="text-gray-300 hover:text-red-500 ml-2 shrink-0"
-              aria-label="Remove"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
+      {/* Bottom: Progress bar & Metrics */}
+      <div className="mt-4 pt-3 border-t border-gray-100">
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="font-semibold text-gray-600">Preparation Progress</span>
+          <span className="font-bold text-blue-600">{pct}%</span>
         </div>
-        {/* Progress bar */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="text-[10px] font-semibold text-gray-500 shrink-0">{daysElapsed}/{totalDays}d</span>
+        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-600 rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
         </div>
-        <p className="text-[10px] text-gray-400 mt-0.5">Wk {company.currentWeek}/{company.totalWeeks} · {pct}% done</p>
+        <div className="flex items-center justify-between text-[11px] text-gray-400 mt-2 font-medium">
+          <span>{daysElapsed}/{totalDays} days</span>
+          <span>{totalQ > 0 ? `${doneQ}/${totalQ} questions` : `${pct}% done`}</span>
+        </div>
       </div>
     </div>
   );
@@ -106,7 +112,6 @@ function ActiveRoadmapCard({
 
 // ─── Compact Explore Roadmap Card ────────────────────────────────────────────
 function ExploreRoadmapCard({ company }: { company: any }) {
-  
   return (
     <div className="flex items-center gap-4 px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 transition-all shrink-0" style={{ minWidth: 240 }}>
       <div className="w-9 h-9 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
@@ -240,7 +245,7 @@ function RoadmapContent() {
         <div className="h-8 bg-gray-100 rounded-lg w-48 animate-pulse" />
         <div className="flex gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="min-w-[300px] h-52 bg-gray-100 rounded-lg animate-pulse" />
+            <div key={i} className="w-[275px] h-[140px] bg-gray-100 rounded-2xl animate-pulse shrink-0" />
           ))}
         </div>
       </div>
@@ -297,7 +302,7 @@ function RoadmapContent() {
       )}
 
       {/* ── Hero: Horizontally scrollable Active Roadmap Cards ── */}
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1">
+      <div className="flex gap-4 overflow-x-auto scrollbar-hide pt-3 pb-4 -mt-3 -mx-2 px-2">
         {companies.map((co) => (
           <ActiveRoadmapCard
             key={co.slug}
@@ -311,19 +316,19 @@ function RoadmapContent() {
         {/* Add company shortcut */}
         <Link
           href="/companies"
-          className="min-w-[160px] flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-300 transition-colors flex-shrink-0 px-5 py-8"
+          className="w-[140px] flex flex-col items-center justify-center gap-2.5 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/20 transition-all flex-shrink-0 p-4 group"
         >
-          <div className="w-10 h-10 rounded-full border-2 border-dashed border-current flex items-center justify-center">
-            <span className="text-xl font-light leading-none">+</span>
+          <div className="w-11 h-11 rounded-full border-2 border-dashed border-gray-300 group-hover:border-blue-400 group-hover:bg-blue-50 flex items-center justify-center transition-all">
+            <span className="text-2xl font-light leading-none text-gray-400 group-hover:text-blue-600 transition-colors">+</span>
           </div>
-          <span className="text-xs font-semibold text-center">Add Roadmap</span>
+          <span className="text-xs font-bold text-gray-500 group-hover:text-blue-600 transition-colors text-center">Add Roadmap</span>
         </Link>
       </div>
 
       {/* ── Explore More Roadmaps ── */}
       <section className="mt-12">
         <h2 className="text-lg font-semibold text-gray-900 mb-5">Explore More Roadmaps</h2>
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1">
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide pt-3 pb-4 -mt-3 -mx-2 px-2">
           {exploreSuggestions.length > 0 ? (
             exploreSuggestions.map((co) => (
               <div key={co.slug}>
@@ -358,6 +363,8 @@ function WeekQuestions({
   weeksCommitted,
   roadmapId,
   questionIds = [],
+  isLocked = false,
+  activeWeekNumber,
   onQuestionClick,
 }: {
   companySlug: string;
@@ -366,6 +373,8 @@ function WeekQuestions({
   weeksCommitted: number;
   roadmapId?: string;
   questionIds?: string[];
+  isLocked?: boolean;
+  activeWeekNumber?: number;
   onQuestionClick?: (qId: string) => void;
 }) {
   const minFrequency = weeksCommitted <= 4 ? 0.6 : weeksCommitted <= 6 ? 0.4 : weeksCommitted <= 8 ? 0.25 : weeksCommitted <= 12 ? 0.1 : 0;
@@ -424,19 +433,47 @@ function WeekQuestions({
         return (
           <div
             key={qId}
-            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors cursor-pointer group gap-2 sm:gap-4"
+            className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border rounded-lg shadow-xs transition-colors cursor-pointer group gap-2 sm:gap-4 ${
+              isLocked
+                ? 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/20'
+                : 'border-gray-200 hover:border-blue-300'
+            }`}
             onClick={() => onQuestionClick?.(qId)}
           >
             <div className="flex items-start sm:items-center gap-3 min-w-0">
-              <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${isDone ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
-                {isDone && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+              <div
+                className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${
+                  isDone
+                    ? 'bg-green-500 border-green-500'
+                    : isLocked
+                    ? 'border-gray-200 bg-gray-100 text-gray-400'
+                    : 'border-gray-300 bg-white'
+                }`}
+                title={isLocked && !isDone ? `Locked — Complete Week ${activeWeekNumber || 1} to unlock` : undefined}
+              >
+                {isDone ? (
+                  <CheckCircle className="w-3.5 h-3.5 text-white" />
+                ) : isLocked ? (
+                  <Lock className="w-2.5 h-2.5 text-gray-400" />
+                ) : null}
               </div>
-              <span className={`font-semibold text-sm truncate ${isDone ? 'text-gray-400 line-through' : 'text-gray-700 group-hover:text-blue-600'}`}>
+              <span className={`font-semibold text-sm truncate ${
+                isDone 
+                  ? 'text-gray-400 line-through' 
+                  : isLocked 
+                    ? 'text-gray-700 group-hover:text-amber-800' 
+                    : 'text-gray-700 group-hover:text-blue-600'
+              }`}>
                 {title}
               </span>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0 ml-8 sm:ml-0">
+            <div className="flex items-center gap-2.5 shrink-0 ml-8 sm:ml-0">
+              {isLocked && !isDone && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5 text-amber-600" /> Locked Preview
+                </span>
+              )}
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                 difficulty === 'Easy' ? 'bg-green-50 text-green-700 border-green-200' :
                 difficulty === 'Medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
@@ -537,19 +574,19 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
             <div 
               key={week.weekNum} 
               className={`border rounded-xl bg-white overflow-hidden transition-all ${
-                isActive ? 'border-blue-200 shadow-sm' : 'border-gray-200'
+                isActive ? 'border-blue-300 shadow-sm' : isLocked ? 'border-gray-200' : 'border-gray-200'
               }`}
             >
               <div 
-                className={`p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50:bg-slate-800/60/50 ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                onClick={() => {
-                  if (!isLocked) setExpandedWeek(isExpanded ? null : week.weekNum);
-                }}
+                className={`p-5 flex items-center justify-between cursor-pointer transition-colors ${
+                  isLocked ? 'hover:bg-amber-50/20' : 'hover:bg-gray-50/60'
+                }`}
+                onClick={() => setExpandedWeek(isExpanded ? null : week.weekNum)}
               >
                 <div className="flex items-center gap-4">
-                  {isDone && <CheckCircle className="w-6 h-6 text-green-500" />}
-                  {isActive && <Play className="w-6 h-6 text-blue-600 fill-blue-50" />}
-                  {isLocked && <Lock className="w-6 h-6 text-gray-300" />}
+                  {isDone && <CheckCircle className="w-6 h-6 text-green-500 shrink-0" />}
+                  {isActive && <Play className="w-6 h-6 text-blue-600 fill-blue-50 shrink-0" />}
+                  {isLocked && <Lock className="w-5 h-5 text-amber-500 shrink-0" />}
 
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">
@@ -563,8 +600,13 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
                           Current
                         </span>
                       )}
+                      {isLocked && (
+                        <span className="bg-amber-50 text-amber-700 border border-amber-200/60 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5 text-amber-600" /> Locked Preview
+                        </span>
+                      )}
                     </div>
-                    <h3 className={`font-bold text-base ${isLocked ? 'text-gray-400' : 'text-gray-900'}`}>
+                    <h3 className={`font-bold text-base ${isDone ? 'text-gray-900' : isActive ? 'text-gray-900' : 'text-gray-700'}`}>
                       {week.topic}
                     </h3>
                   </div>
@@ -586,17 +628,33 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
                     </div>
                   </div>
 
-                  {!isLocked && (
-                    <div className="text-gray-400">
-                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </div>
-                  )}
-                  {isLocked && <Lock className="w-4 h-4 text-gray-300" />}
+                  <div className="text-gray-400">
+                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  </div>
                 </div>
               </div>
 
-              {isExpanded && !isLocked && (
-                <div className="border-t border-gray-100 bg-gray-50 p-5">
+              {isExpanded && (
+                <div className={`border-t p-5 ${isLocked ? 'border-amber-100 bg-amber-50/20' : 'border-gray-100 bg-gray-50'}`}>
+                  {isLocked && (
+                    <div className="mb-4 flex items-center justify-between rounded-xl bg-amber-50 border border-amber-200/80 px-4 py-3 text-xs text-amber-900 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                          <Lock className="w-3.5 h-3.5 text-amber-700" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-amber-950">Week {week.weekNum} is locked.</span>{' '}
+                          <span className="text-amber-800">
+                            You can preview and practice these questions early. Solve all questions in{' '}
+                            <strong className="underline decoration-amber-400">Week {company.currentWeek}</strong> to officially unlock this week and advance your roadmap progress.
+                          </span>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-200/50 px-2 py-1 rounded-md hidden md:inline-block">
+                        Preview Only
+                      </span>
+                    </div>
+                  )}
                   <WeekQuestions
                     companySlug={company.slug}
                     topic={week.topic}
@@ -604,6 +662,8 @@ function RoadmapCurriculumView({ company }: { company: UserRoadmapCompany }) {
                     weeksCommitted={company.totalWeeks}
                     roadmapId={company.roadmapId}
                     questionIds={week.questionIds ?? []}
+                    isLocked={isLocked}
+                    activeWeekNumber={company.currentWeek}
                     onQuestionClick={(qId) => router.push(`/practice/${qId}`)}
                   />
                 </div>

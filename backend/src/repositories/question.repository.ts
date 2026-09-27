@@ -38,7 +38,17 @@ export const questionRepository = {
         query.roundType = filter.roundType;
       }
     }
-    if (filter.topic) query.topics = filter.topic;
+    if (filter.topic) {
+      if (filter.topic.includes('&')) {
+        const parts = filter.topic.split('&').map(t => t.trim()).filter(Boolean);
+        query.topics = { $in: [filter.topic, ...parts] };
+      } else if (filter.topic.includes(',')) {
+        const parts = filter.topic.split(',').map(t => t.trim()).filter(Boolean);
+        query.topics = { $in: [filter.topic, ...parts] };
+      } else {
+        query.topics = filter.topic;
+      }
+    }
     if (filter.questionType) query.questionType = filter.questionType;
     if (filter.isMcq !== undefined) query.isMcq = filter.isMcq;
     if (filter.targetRole) query.targetRoles = filter.targetRole;

@@ -16,6 +16,7 @@ export interface IQuestionCompletion extends Document {
   difficulty: 'Easy' | 'Medium' | 'Hard'; // denormalized
   xpEarned: number;
   isSeeded?: boolean;
+  verifiedViaPlatform?: boolean;
   completedAt: Date;
 }
 
@@ -47,6 +48,7 @@ const QuestionCompletionSchema = new Schema<IQuestionCompletion>(
     },
     xpEarned: { type: Number, required: true, min: 0 },
     isSeeded: { type: Boolean, default: false },
+    verifiedViaPlatform: { type: Boolean, default: false },
     completedAt: { type: Date, default: Date.now },
   },
   {

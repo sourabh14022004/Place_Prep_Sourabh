@@ -28,7 +28,7 @@ export default function CustomRoadmapSection() {
     return (
       <section className="mt-12">
         <h2 className="text-lg font-semibold text-gray-900 mb-5">Custom Roadmaps</h2>
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1">
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide pt-3 pb-4 -mt-3 -mx-2 px-2">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="min-w-[300px] h-[74px] bg-gray-100 rounded-xl animate-pulse shrink-0" />
           ))}
@@ -45,7 +45,7 @@ export default function CustomRoadmapSection() {
   return (
     <section className="mt-12">
       <h2 className="text-lg font-semibold text-gray-900 mb-5">Custom Roadmaps</h2>
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-4 -mx-1 px-1">
+      <div className="flex gap-4 overflow-x-auto scrollbar-hide pt-3 pb-4 -mt-3 -mx-2 px-2">
         {ordered.map((r) => (
           <CustomRoadmapCardView key={r.id} roadmap={r} onChanged={() => mutate()} />
         ))}

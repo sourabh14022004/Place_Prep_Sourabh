@@ -257,7 +257,20 @@ export default function DashboardPage() {
                                 const result: any = await completeQuestion(q.id, co._id);
                                 await mutateCompleted();
                                 if (!result?.alreadyCompleted) {
-                                  toast.success(`+${q.xp} XP earned!`, { duration: 2000 });
+                                  if (result?.unlinkedPlatform) {
+                                    toast.success(`+${q.xp} XP earned! (Self-marked)`, {
+                                      description: `Connect your ${result.unlinkedPlatform} account to auto-verify your solves and showcase your profile for placement prep!`,
+                                      action: {
+                                        label: "Connect Profile",
+                                        onClick: () => router.push("/profile"),
+                                      },
+                                      duration: 6000,
+                                    });
+                                  } else if (result?.verifiedViaPlatform) {
+                                    toast.success(`+${q.xp} XP earned! Verified via ${result.platformName || 'LeetCode'} ✓`, { duration: 3000 });
+                                  } else {
+                                    toast.success(`+${q.xp} XP earned!`, { duration: 2000 });
+                                  }
                                 }
                               } else {
                                 const res = await fetch(`/api/questions/${q.id}/complete`, {

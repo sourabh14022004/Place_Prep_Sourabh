@@ -464,13 +464,22 @@ export const studentService = {
     // even when the question WAS completed (after page refresh, re-click = conflict = unchecked).
     const existing = await QuestionCompletion.findOne({ studentId: oid, questionId: qid });
     if (existing) {
-      return { xpEarned: existing.xpEarned ?? 0, totalXp: 0, alreadyCompleted: true };
+      return {
+        xpEarned: existing.xpEarned ?? 0,
+        totalXp: 0,
+        alreadyCompleted: true,
+        verifiedViaPlatform: (existing as any).verifiedViaPlatform ?? false,
+      };
     }
 
     // ── Platform verification ─────────────────────────────────────────────────
     const lcUrl: string | undefined = (question as any).leetcodeUrl;
     const srcUrl: string | undefined = (question as any).sourceUrl;
     const isCfUrl = !!srcUrl?.includes('codeforces.com');
+
+    let verifiedViaPlatform = false;
+    let unlinkedPlatform: 'LeetCode' | 'Codeforces' | undefined = undefined;
+    let platformName: string | undefined = undefined;
 
     if (lcUrl || isCfUrl) {
       const profile = await StudentProfile.findOne({ userId: new mongoose.Types.ObjectId(userId) });
@@ -479,28 +488,35 @@ export const studentService = {
       const cfHandle = extractHandle(handles.codeforces);
 
       if (lcUrl) {
+        platformName = 'LeetCode';
         if (!lcHandle) {
-          throw ApiError.badRequest(
-            'Link your LeetCode profile in your Profile page to verify this submission.'
-          );
-        }
-        const solved = await verifyLeetCodeSolve(lcHandle, lcUrl);
-        if (!solved) {
-          throw ApiError.badRequest(
-            'No accepted LeetCode submission found for this problem. Solve it on LeetCode first, then try again.'
-          );
+          // Scenario: User hasn't connected LeetCode profile.
+          // Allow them to self-mark as done, but flag as unlinked so UI can remind them to connect.
+          verifiedViaPlatform = false;
+          unlinkedPlatform = 'LeetCode';
+        } else {
+          const solved = await verifyLeetCodeSolve(lcHandle, lcUrl);
+          if (!solved) {
+            throw ApiError.badRequest(
+              'No accepted LeetCode submission found for this problem. Solve it on LeetCode first, then try again.'
+            );
+          }
+          verifiedViaPlatform = true;
         }
       } else if (isCfUrl) {
+        platformName = 'Codeforces';
         if (!cfHandle) {
-          throw ApiError.badRequest(
-            'Link your Codeforces profile in your Profile page to verify this submission.'
-          );
-        }
-        const solved = await verifyCodeforcesSolve(cfHandle, srcUrl!);
-        if (!solved) {
-          throw ApiError.badRequest(
-            'No accepted Codeforces submission found for this problem. Solve it on Codeforces first, then try again.'
-          );
+          // Scenario: User hasn't connected Codeforces profile.
+          verifiedViaPlatform = false;
+          unlinkedPlatform = 'Codeforces';
+        } else {
+          const solved = await verifyCodeforcesSolve(cfHandle, srcUrl!);
+          if (!solved) {
+            throw ApiError.badRequest(
+              'No accepted Codeforces submission found for this problem. Solve it on Codeforces first, then try again.'
+            );
+          }
+          verifiedViaPlatform = true;
         }
       }
     }
@@ -521,6 +537,7 @@ export const studentService = {
         companySlug: question.companySlug ?? null,
         difficulty: safeDifficulty,
         xpEarned,
+        verifiedViaPlatform,
       }),
       studentRepository.addXp(userId, xpEarned),
     ]);
@@ -591,7 +608,13 @@ export const studentService = {
     // B14 FIX: Removed XP persistent notification — XP feedback is toast-only in the UI
     // (previously this created a permanent notification in the bell for every solved question)
 
-    return { xpEarned, totalXp: 0 }; // totalXp fetched fresh by client
+    return {
+      xpEarned,
+      totalXp: 0,
+      verifiedViaPlatform,
+      unlinkedPlatform,
+      platformName,
+    }; // totalXp fetched fresh by client
   },
 
   async uncompleteQuestion(userId: string, questionId: string): Promise<void> {

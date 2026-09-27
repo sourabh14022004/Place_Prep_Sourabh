@@ -68,13 +68,24 @@ export async function GET(request: Request): Promise<Response> {
         try {
           const topicLabel = activeWeek.topicLabel as string;
 
-          // Try 1: exact topic match (works when topicLabel === question's topic string)
-          let result = await questionRepository.findMany({
-            companySlug: r.companySlug,
-            topic: topicLabel,
-            limit: 20,
-          });
-          let questions = result?.questions ?? [];
+          let questions: any[] = [];
+          if (activeWeek.questionIds && activeWeek.questionIds.length > 0) {
+            questions = await questionRepository.findByIds(activeWeek.questionIds.map((id: any) => id.toString()));
+            tasksSource = questions.length > 0 ? 'plan' : 'none';
+          }
+
+          // Try 1: topic match (works when topicLabel matches question's topics)
+          if (questions.length === 0) {
+            let result = await questionRepository.findMany({
+              companySlug: r.companySlug,
+              topic: topicLabel,
+              limit: 20,
+            });
+            questions = result?.questions ?? [];
+            if (questions.length > 0) {
+              tasksSource = 'plan';
+            }
+          }
 
           // Try 2: if exact match returns nothing, try any questions for this company.
           // HONESTY FIX: these are NOT the scheduled plan — flagged 'extra' so the UI
@@ -86,8 +97,6 @@ export async function GET(request: Request): Promise<Response> {
             });
             questions = fallback?.questions ?? fallback ?? [];
             tasksSource = questions.length > 0 ? 'extra' : 'none';
-          } else {
-            tasksSource = 'plan';
           }
 
           const completedSet = completedByCompany.get(r.companySlug) ?? new Set<string>();
