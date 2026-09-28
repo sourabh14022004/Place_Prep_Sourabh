@@ -473,15 +473,21 @@ export const studentService = {
     }
 
     // ── Platform verification ─────────────────────────────────────────────────
-    const lcUrl: string | undefined = (question as any).leetcodeUrl;
-    const srcUrl: string | undefined = (question as any).sourceUrl;
-    const isCfUrl = !!srcUrl?.includes('codeforces.com');
+    const rawUrl: string =
+      (question as any).leetcodeUrl ||
+      (question as any).sourceUrl ||
+      (question as any).practiceUrl ||
+      '';
+    const isLcUrl = typeof rawUrl === 'string' && rawUrl.includes('leetcode.com');
+    const isCfUrl = typeof rawUrl === 'string' && rawUrl.includes('codeforces.com');
+    const lcUrl = isLcUrl ? rawUrl : undefined;
+    const cfUrl = isCfUrl ? rawUrl : undefined;
 
     let verifiedViaPlatform = false;
     let unlinkedPlatform: 'LeetCode' | 'Codeforces' | undefined = undefined;
     let platformName: string | undefined = undefined;
 
-    if (lcUrl || isCfUrl) {
+    if (lcUrl || cfUrl) {
       const profile = await StudentProfile.findOne({ userId: new mongoose.Types.ObjectId(userId) });
       const handles = (profile as any)?.platformHandles ?? {};
       const lcHandle = extractHandle(handles.leetcode);
@@ -503,14 +509,14 @@ export const studentService = {
           }
           verifiedViaPlatform = true;
         }
-      } else if (isCfUrl) {
+      } else if (cfUrl) {
         platformName = 'Codeforces';
         if (!cfHandle) {
           // Scenario: User hasn't connected Codeforces profile.
           verifiedViaPlatform = false;
           unlinkedPlatform = 'Codeforces';
         } else {
-          const solved = await verifyCodeforcesSolve(cfHandle, srcUrl!);
+          const solved = await verifyCodeforcesSolve(cfHandle, cfUrl);
           if (!solved) {
             throw ApiError.badRequest(
               'No accepted Codeforces submission found for this problem. Solve it on Codeforces first, then try again.'

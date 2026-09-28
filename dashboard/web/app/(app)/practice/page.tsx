@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import {
   ArrowLeft, ExternalLink, Search, X, Monitor, Building, Calculator, Users, Zap,
   GraduationCap, FileText, HelpCircle, SearchX, MousePointerClick, Flame,
-  CheckCircle2, Circle, Lightbulb, BookOpenCheck,
+  CheckCircle2, Circle, Lightbulb, BookOpenCheck, ShieldCheck, ShieldAlert,
+  AlertTriangle, Link2, Sparkles, Loader2,
 } from "lucide-react";
 
 const IconMap: Record<string, React.ElementType> = {
@@ -16,7 +17,7 @@ const IconMap: Record<string, React.ElementType> = {
 
 import {
   usePractice, usePracticeCategories, useTopics, useCompanies,
-  useCompletedQuestions, usePracticeMyStats, completeQuestion,
+  useCompletedQuestions, usePracticeMyStats, completeQuestion, usePlatformProfiles,
 } from "@/lib/hooks";
 import { type Difficulty, getPracticeUrl, getPlatformInfo } from "@/lib/constants";
 import ErrorState from "@/components/ErrorState";
@@ -75,10 +76,12 @@ function QuizModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { data: profileData } = usePlatformProfiles();
   const [picked, setPicked] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(alreadySolved);
   const [completing, setCompleting] = useState(false);
   const [solved, setSolved] = useState(alreadySolved);
+  const [showWarningModal, setShowWarningModal] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -94,6 +97,20 @@ function QuizModal({
   const pickedOption = question.options?.find(o => o.label === picked);
   const isCorrect = pickedOption?.isCorrect ?? false;
 
+  const practiceUrl = getPracticeUrl(question);
+  const platformInfo = practiceUrl ? getPlatformInfo(practiceUrl) : null;
+  const platformName = platformInfo?.name;
+  const isSupportedPlatform = platformName === "LeetCode" || platformName === "Codeforces";
+
+  const handles = profileData?.handles ?? {};
+  const userHandle =
+    platformName === "LeetCode"
+      ? handles.leetcode
+      : platformName === "Codeforces"
+      ? handles.codeforces
+      : null;
+  const isConnected = isSupportedPlatform && Boolean(userHandle?.trim());
+
   const handleSubmit = async () => {
     if (!isMcq || !picked) return;
     setSubmitted(true);
@@ -102,13 +119,23 @@ function QuizModal({
     }
   };
 
-  const handleComplete = async () => {
+  const handleActionClick = () => {
+    if (solved) return;
+    if (isSupportedPlatform && !isConnected) {
+      setShowWarningModal(true);
+      return;
+    }
+    handleComplete();
+  };
+
+  const handleComplete = async (bypassWarning = false) => {
+    if (bypassWarning) setShowWarningModal(false);
     setCompleting(true);
     try {
       const result: any = await completeQuestion(question.id);
       setSolved(true);
       if (result?.unlinkedPlatform) {
-        toast.success("Marked as completed (Self-marked)", {
+        toast.warning("Marked as completed (Self-marked — unverified)", {
           description: `Connect your ${result.unlinkedPlatform} profile in Profile settings to auto-verify your solves and showcase your profile for placement prep!`,
           action: {
             label: "Connect Profile",
@@ -117,12 +144,23 @@ function QuizModal({
           duration: 6000,
         });
       } else if (result?.verifiedViaPlatform) {
-        toast.success(`Marked as completed — verified via ${result.platformName || 'LeetCode'} ✓`, { duration: 3000 });
+        toast.success(`🎉 Solved & Verified via ${result.platformName || platformName || 'platform'}!`, {
+          description: `Your accepted submission for @${userHandle} was verified!`,
+          duration: 4000,
+        });
       } else {
         toast.success("Marked as completed — progress updated.");
       }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not mark as completed.");
+    } catch (e: any) {
+      const msg = e?.message ?? "Could not mark as completed.";
+      if (msg.includes("No accepted") || msg.includes("Solve it") || msg.includes("not found")) {
+        toast.error(msg, {
+          description: userHandle ? `Make sure your submission on ${platformName} was accepted under @${userHandle}.` : undefined,
+          duration: 7000,
+        });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setCompleting(false);
     }
@@ -157,19 +195,29 @@ function QuizModal({
           {solved && (
             <span className="text-xs bg-green-50 text-green-700 rounded px-1.5 py-0.5 font-medium">✓ Solved</span>
           )}
-          {(() => {
-            const practiceUrl = getPracticeUrl(question);
-            return practiceUrl ? (
+          {practiceUrl && (
+            <div className="inline-flex items-center gap-1.5 flex-wrap">
               <a
                 href={practiceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 font-semibold"
               >
-                Solve on {getPlatformInfo(practiceUrl).name} <ExternalLink className="w-3 h-3" />
+                Solve on {platformName ?? "Platform"} <ExternalLink className="w-3 h-3" />
               </a>
-            ) : null;
-          })()}
+              {isSupportedPlatform && (
+                isConnected ? (
+                  <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" /> @{userHandle}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-600" /> Not connected
+                  </span>
+                )
+              )}
+            </div>
+          )}
         </div>
 
         {/* Body */}
@@ -265,13 +313,22 @@ function QuizModal({
             <div className="flex items-center gap-2 text-sm font-medium text-green-700">
               <BookOpenCheck className="w-4 h-4" /> Completed — great job!
             </div>
+          ) : isConnected ? (
+            <button
+              onClick={handleActionClick}
+              disabled={completing}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60 shadow-sm"
+            >
+              {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              {completing ? "Verifying…" : "Verify Submission"}
+            </button>
           ) : (
             <button
-              onClick={handleComplete}
+              onClick={handleActionClick}
               disabled={completing}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-sm"
             >
-              <CheckCircle2 className="w-4 h-4" />
+              {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               {completing ? "Saving…" : "Mark as Completed"}
             </button>
           )}
@@ -287,12 +344,68 @@ function QuizModal({
           )}
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-100:bg-slate-800 transition-colors"
+            className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-100 transition-colors"
           >
             Close
           </button>
         </div>
       </div>
+
+      {/* ── Unverified Submission Warning Modal inside practice list modal ── */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 relative">
+            <button
+              onClick={() => setShowWarningModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-lg"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mb-4 shadow-sm">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-gray-900 leading-snug">
+              Unverified Submission Warning
+            </h3>
+
+            <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+              You are marking this <span className="font-semibold text-gray-900">{platformName}</span> problem as done <strong>without verifying</strong> your submission from the platform.
+            </p>
+
+            <div className="my-4 p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 leading-relaxed space-y-1.5">
+              <div className="font-semibold flex items-center gap-1.5 text-amber-900">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                Make your progress genuine & valid
+              </div>
+              <p className="text-amber-800">
+                Connecting your {platformName} profile allows PlacePrep to automatically verify that your solution passed all test cases. This keeps your placement readiness progress authentic and builds a credible profile for recruiters.
+              </p>
+            </div>
+
+            <div className="space-y-2 mt-5">
+              <button
+                onClick={() => router.push("/profile")}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Link2 className="w-4 h-4" />
+                Connect {platformName} Profile
+              </button>
+
+              <button
+                onClick={() => handleComplete(true)}
+                disabled={completing}
+                className="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Mark Done Anyway (Unverified)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
