@@ -119,9 +119,13 @@ export interface UserRoadmapCompany {
  */
 export function getPracticeUrl(q: any): string | null {
   if (!q) return null;
+  // If it's an interactive MCQ with options, practice happens directly inside PlacePrep portal
+  if (q.isMcq && Array.isArray(q.options) && q.options.length > 0) return null;
   const rawUrl = q.practiceUrl || q.leetcodeUrl || q.sourceUrl || q.url || (typeof q.link === "string" ? q.link : null);
   if (!rawUrl || typeof rawUrl !== "string") return null;
   const trimmed = rawUrl.trim();
+  // Don't treat raw GitHub markdown repositories as external interactive practice platforms
+  if (trimmed.includes("github.com/")) return null;
   return trimmed.length > 0 ? trimmed : null;
 }
 

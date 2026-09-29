@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ExternalLink, Loader2, CheckCircle, Lightbulb,
   ChevronDown, ChevronUp, Zap, Tag, RotateCcw, AlertCircle,
-  ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, X, Link2,
+  ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, X, Link2, HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuestion, useCompletedQuestions, completeQuestion, usePlatformProfiles } from "@/lib/hooks";
@@ -114,6 +114,35 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
       : null;
   const isConnected = isSupportedPlatform && Boolean(userHandle?.trim());
   const platformStyle = platformName ? (PLATFORM_COLORS[platformName] ?? { bg: "bg-gray-100", text: "text-gray-700", abbr: platformName.slice(0, 2).toUpperCase() }) : null;
+
+  // ── Interactive MCQ Quiz State ──
+  const hasOptions = Boolean(question.isMcq && Array.isArray(question.options) && question.options.length > 0);
+  const options = (question.options as Array<{ label: string; text: string; isCorrect: boolean }>) ?? [];
+  const [picked, setPicked] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(isSolved);
+
+  const pickedOption = options.find(o => o.label === picked);
+  const isCorrect = pickedOption?.isCorrect ?? false;
+
+  const handleSubmitAnswer = async () => {
+    if (!picked) return;
+    setSubmitted(true);
+    if (!isCorrect) {
+      toast.error("Not quite — check the explanation below.");
+    } else {
+      toast.success("Correct answer! 🎉", {
+        description: `+${xp} XP awarded! Marking completed.`,
+      });
+      if (!isSolved) {
+        handleMarkDone();
+      }
+    }
+  };
+
+  const handleResetAnswer = () => {
+    setPicked(null);
+    setSubmitted(false);
+  };
 
   const handleActionClick = () => {
     if (isSolved) return;
@@ -301,6 +330,82 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
 
+        {/* ── Interactive MCQ Quiz Card ── */}
+        {hasOptions && (
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4 text-violet-600" />
+                Select Your Answer
+              </span>
+              {submitted && (
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${isCorrect ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                  {isCorrect ? "✓ Correct" : "✗ Not quite"}
+                </span>
+              )}
+            </div>
+
+            <div className="space-y-2.5">
+              {options.map((opt) => {
+                const isPicked = picked === opt.label;
+                const answered = submitted;
+                const showCorrect = answered && opt.isCorrect;
+                const showWrong = answered && isPicked && !opt.isCorrect;
+                return (
+                  <button
+                    key={opt.label}
+                    disabled={answered}
+                    onClick={() => setPicked(opt.label)}
+                    className={`w-full flex items-start gap-3 text-sm rounded-xl px-4 py-3.5 border transition-all text-left ${
+                      showCorrect ? "bg-green-50 border-green-400 text-green-900 ring-1 ring-green-300 font-medium" :
+                      showWrong   ? "bg-red-50 border-red-300 text-red-800 font-medium" :
+                      answered    ? "bg-white border-gray-200 text-gray-400 opacity-60" :
+                      isPicked    ? "bg-blue-50 border-blue-400 text-blue-900 ring-1 ring-blue-200 font-medium" :
+                                    "bg-white border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer"
+                    }`}
+                  >
+                    <span className={`font-mono text-xs font-bold shrink-0 mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center border ${
+                      showCorrect ? "bg-green-100 border-green-300 text-green-700" :
+                      showWrong ? "bg-red-100 border-red-300 text-red-700" :
+                      isPicked ? "bg-blue-100 border-blue-300 text-blue-700" :
+                      "bg-gray-100 border-gray-200 text-gray-500"
+                    }`}>
+                      {opt.label}
+                    </span>
+                    <span className="flex-1 mt-0.5">{opt.text}</span>
+                    {showCorrect && <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />}
+                    {showWrong && <X className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              {!submitted ? (
+                <button
+                  onClick={handleSubmitAnswer}
+                  disabled={!picked}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
+                >
+                  Check Answer
+                </button>
+              ) : !isCorrect ? (
+                <button
+                  onClick={handleResetAnswer}
+                  className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+                >
+                  Try Again
+                </button>
+              ) : (
+                <div className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  Great job! Solved correctly on PlacePrep.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Platform CTA ── */}
         {practiceUrl && (
           <div
@@ -410,7 +515,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* ── Explanation ── */}
-        {explanation && (
+        {explanation && (!hasOptions || submitted) && (
           <Section title="Explanation" icon={Lightbulb} defaultOpen>
             <p className="whitespace-pre-wrap text-gray-700">{explanation}</p>
           </Section>
@@ -426,7 +531,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
         )}
 
         {/* Bottom CTA */}
-        {!isSolved && (
+        {!isSolved && !hasOptions && (
           <div className="pt-2 pb-6 space-y-2">
             {isConnected ? (
               <>

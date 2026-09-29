@@ -47,7 +47,8 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
 const diffBadge = (d: string) =>
   d === "Easy"   ? "bg-green-50 text-green-700 border border-green-200" :
   d === "Medium" ? "bg-blue-50 text-blue-700 border border-blue-200" :
-                   "bg-red-50 text-red-600 border border-red-200";
+  d === "Hard"   ? "bg-red-50 text-red-600 border border-red-200" :
+                   "bg-gray-50 text-gray-600 border border-gray-200";
 
 // ── Quiz modal ───────────────────────────────────────────────────────────────
 interface QuizQuestion {
@@ -116,7 +117,19 @@ function QuizModal({
     setSubmitted(true);
     if (!isCorrect) {
       toast.error("Not quite — check the explanation below.");
+    } else {
+      toast.success("Correct answer! 🎉", {
+        description: "Great job! Saving your progress...",
+      });
+      if (!solved) {
+        handleComplete();
+      }
     }
+  };
+
+  const handleReset = () => {
+    setPicked(null);
+    setSubmitted(false);
   };
 
   const handleActionClick = () => {
@@ -337,9 +350,17 @@ function QuizModal({
             <button
               onClick={handleSubmit}
               disabled={!picked}
-              className="px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             >
-              Submit Answer
+              Check Answer
+            </button>
+          )}
+          {isMcq && submitted && !isCorrect && (
+            <button
+              onClick={handleReset}
+              className="px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+            >
+              Try Again
             </button>
           )}
           <button
@@ -734,10 +755,17 @@ function PracticeContent() {
             <div className="divide-y divide-gray-50">
               {filteredQuestions.map((q, idx) => {
                 const solved = completedSet.has(String(q.id));
+                const hasOptions = Boolean(q.isMcq && Array.isArray(q.options) && q.options.length > 0);
                 return (
                   <button
                     key={q.id}
-                    onClick={() => router.push(`/practice/${q.id}`)}
+                    onClick={() => {
+                      if (hasOptions) {
+                        openQuiz(q);
+                      } else {
+                        router.push(`/practice/${q.id}`);
+                      }
+                    }}
                     className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-blue-50/40 transition-colors cursor-pointer text-left group"
                   >
                     <span className="text-xs text-gray-400 font-mono w-6 shrink-0">
@@ -770,11 +798,25 @@ function PracticeContent() {
                       </div>
                     </div>
 
-                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${diffBadge(q.diff)}`}>
-                      {q.diff}
-                    </span>
+                    {q.diff ? (
+                      <span className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${diffBadge(q.diff)}`}>
+                        {q.diff}
+                      </span>
+                    ) : null}
 
-                    {(() => {
+                    {hasOptions ? (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openQuiz(q);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 hover:text-violet-800 rounded-lg transition-colors shrink-0 border border-violet-200 cursor-pointer"
+                        title="Answer MCQ in portal"
+                      >
+                        <HelpCircle className="w-3.5 h-3.5 text-violet-600" />
+                        <span>Solve Quiz</span>
+                      </span>
+                    ) : (() => {
                       const practiceUrl = getPracticeUrl(q);
                       return practiceUrl ? (
                         <a
