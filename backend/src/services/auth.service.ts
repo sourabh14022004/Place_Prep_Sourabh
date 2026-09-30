@@ -47,6 +47,12 @@ export const authService = {
       );
     }
 
+    if (!user.passwordHash) {
+      throw ApiError.badRequest(
+        'This account is registered via Google Sign-In. Please sign in using Google.'
+      );
+    }
+
     const isValid = await comparePassword(password, user.passwordHash);
     if (!isValid) {
       throw ApiError.unauthorized('Invalid email or password.');
@@ -102,6 +108,12 @@ export const authService = {
   ): Promise<void> {
     const user = await userRepository.findByIdWithPassword(userId);
     if (!user) throw ApiError.notFound('User');
+
+    if (!user.passwordHash) {
+      throw ApiError.badRequest(
+        'This account is registered via Google Sign-In and does not have a password.'
+      );
+    }
 
     const isValid = await comparePassword(oldPassword, user.passwordHash);
     if (!isValid) {
@@ -179,5 +191,115 @@ export const authService = {
     await userRepository.updatePassword(userId, passwordHash);
 
     return { tempPassword };
+  },
+
+  /**
+   * Authenticate or auto-register student via Google OAuth.
+   * STRICTLY RESTRICTED to @nst.rishihood.edu.in email domain.
+   */
+  async loginWithGoogle(data: {
+    email: string;
+    name?: string;
+    picture?: string;
+    googleId?: string;
+  }): Promise<{
+    token: string;
+    role: string;
+    userId: string;
+    name: string;
+    redirectUrl: string;
+    isNewUser: boolean;
+  }> {
+    const email = data.email.toLowerCase().trim();
+    if (!email.endsWith('@nst.rishihood.edu.in')) {
+      throw ApiError.forbidden(
+        'Access restricted: Only Newton School of Technology (@nst.rishihood.edu.in) accounts are permitted.'
+      );
+    }
+
+    let user = await userRepository.findByEmail(email);
+    let isNewUser = false;
+
+    if (user) {
+      if (!user.isActive) {
+        throw ApiError.forbidden(
+          'Your account has been deactivated. Please contact admin.'
+        );
+      }
+
+      if (data.googleId && (!user.googleId || user.authProvider !== 'google')) {
+        await userRepository.updateGoogleInfo(user._id.toString(), data.googleId);
+      } else {
+        await userRepository.updateLastLogin(user._id.toString());
+      }
+    } else {
+      isNewUser = true;
+      user = await userRepository.create({
+        email,
+        role: 'student',
+        authProvider: 'google',
+        googleId: data.googleId,
+      });
+    }
+
+    // Determine or create profile
+    let name = data.name || email.split('@')[0];
+    if (user.role === 'student') {
+      const profile = await studentRepository.findByUserId(user._id.toString());
+      if (!profile) {
+        const newProfile = await studentRepository.create({
+          userId: user._id,
+          fullName: data.name || email.split('@')[0],
+          batch: '2025',
+          branch: 'CS & AI',
+          year: '2nd',
+          avatarUrl: data.picture,
+          onboardingComplete: false,
+          placementStatus: 'IN_PROGRESS',
+          xpTotal: 0,
+          currentStreakDays: 1,
+          bestStreakDays: 1,
+          targetDomains: [],
+          targetCategories: [],
+          targetCompanySlugs: [],
+          topicSelfRatings: new Map(),
+          prepWeeksCommitted: 12,
+          dailyGoal: 3,
+        } as never);
+        if (newProfile) name = newProfile.fullName;
+      } else {
+        name = profile.fullName;
+        if (data.picture && !profile.avatarUrl) {
+          await studentRepository.updateByUserId(user._id.toString(), { avatarUrl: data.picture });
+        }
+      }
+    } else if (user.role === 'faculty') {
+      const profile = await facultyRepository.findByUserId(user._id.toString());
+      if (profile) name = profile.fullName;
+    } else {
+      name = 'Administrator';
+    }
+
+    const token = signToken({
+      userId: user._id.toString(),
+      role: user.role,
+      email: user.email,
+    });
+
+    const ROLE_HOME: Record<string, string> = {
+      student: '/dashboard',
+      faculty: '/faculty',
+      admin: '/admin/overview',
+    };
+    const redirectUrl = ROLE_HOME[user.role] || ROLE_HOME.student;
+
+    return {
+      token,
+      role: user.role,
+      userId: user._id.toString(),
+      name,
+      redirectUrl,
+      isNewUser,
+    };
   },
 };

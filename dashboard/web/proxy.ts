@@ -22,7 +22,7 @@ import { jwtVerify } from 'jose';
 type Role = 'student' | 'faculty' | 'admin';
 
 const PUBLIC_PATHS = new Set(['/', '/login', '/register']);
-const PUBLIC_PREFIXES = ['/api/auth/login', '/api/auth/logout', '/invite'];
+const PUBLIC_PREFIXES = ['/api/auth/login', '/api/auth/logout', '/api/auth/google', '/invite'];
 
 const STATIC_PREFIXES = [
   '/_next', '/favicon', '/robots.txt', '/sitemap.xml',

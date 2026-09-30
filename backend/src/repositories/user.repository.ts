@@ -45,8 +45,10 @@ export const userRepository = {
   /** Create a new user */
   async create(data: {
     email: string;
-    passwordHash: string;
+    passwordHash?: string;
     role: 'student' | 'faculty' | 'admin';
+    authProvider?: 'local' | 'google';
+    googleId?: string;
     isSeeded?: boolean;
   }): Promise<IUser> {
     const user = new User(data);
@@ -61,6 +63,15 @@ export const userRepository = {
   /** Update email address */
   async updateEmail(id: string, email: string): Promise<void> {
     await User.findByIdAndUpdate(id, { email: email.toLowerCase().trim() });
+  },
+
+  /** Update Google OAuth identity */
+  async updateGoogleInfo(id: string, googleId: string): Promise<void> {
+    await User.findByIdAndUpdate(id, {
+      googleId,
+      authProvider: 'google',
+      lastLoginAt: new Date(),
+    });
   },
 
   /** Update last login timestamp */

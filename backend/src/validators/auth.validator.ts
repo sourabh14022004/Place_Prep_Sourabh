@@ -49,6 +49,16 @@ export const createUserSchema = z.object({
   initials: z.string().max(3).optional(),
 });
 
+export const googleAuthSchema = z.object({
+  credential: z.string().optional(),
+  email: z.string().email('Invalid email address').optional(),
+  name: z.string().optional(),
+  picture: z.string().optional(),
+  googleId: z.string().optional(),
+  devMode: z.boolean().optional(),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;

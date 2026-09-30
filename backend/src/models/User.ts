@@ -9,7 +9,9 @@ import type { UserRole } from '../types/shared.types';
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
+  authProvider?: 'local' | 'google';
+  googleId?: string;
   role: UserRole;
   isActive: boolean;
   lastLoginAt?: Date;
@@ -32,8 +34,19 @@ const UserSchema = new Schema<IUser>(
     },
     passwordHash: {
       type: String,
-      required: [true, 'Password hash is required'],
+      required: false,
       select: false, // never returned in queries by default
+    },
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+      index: true,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      index: true,
     },
     role: {
       type: String,
