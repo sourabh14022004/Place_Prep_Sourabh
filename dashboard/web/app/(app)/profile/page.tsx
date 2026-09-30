@@ -303,12 +303,16 @@ function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
  const [savingAbout, setSavingAbout] = useState(false);
  const [savingSocials, setSavingSocials] = useState(false);
  const [isUploading, setIsUploading] = useState(false);
+ const [avatarError, setAvatarError] = useState(false);
 
  useEffect(() => {
   setBio(user.bio || "");
   setLinkedin(user.linkedin || "");
   setGithub(user.github || "");
- }, [user.bio, user.linkedin, user.github]);
+  setAvatarError(false);
+ }, [user.bio, user.linkedin, user.github, user.avatarUrl]);
+
+ const initials = user.initials || (user.name ? user.name.split(/[\s._]+/).map((p: string) => p[0]).join('').slice(0, 2).toUpperCase() : "ST");
 
  const handleSaveAbout = async () => {
   setSavingAbout(true);
@@ -388,11 +392,23 @@ function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
       <div className="bg-white border border-gray-200 rounded-2xl p-5 text-center shadow-sm">
        {/* Avatar */}
        <div className="relative inline-block mb-4">
-        <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg overflow-hidden">
-         {user.avatarUrl ? (
-           <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+        <div className="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg overflow-hidden relative">
+         {user.avatarUrl && !avatarError ? (
+           <img
+             src={user.avatarUrl}
+             alt={user.name || "Avatar"}
+             referrerPolicy="no-referrer"
+             crossOrigin="anonymous"
+             onError={() => setAvatarError(true)}
+             className="w-full h-full object-cover"
+           />
          ) : (
-           user.initials
+           <span>{initials}</span>
+         )}
+         {isUploading && (
+           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+             <Loader2 className="w-6 h-6 text-white animate-spin" />
+           </div>
          )}
         </div>
         <label

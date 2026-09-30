@@ -57,7 +57,17 @@ function ProgressProfileSidebar({
           <div className="relative shrink-0">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 flex items-center justify-center text-white font-bold text-base shadow-inner overflow-hidden">
               {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={name} className="w-full h-full object-cover" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.avatarUrl}
+                  alt={name}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
               ) : (
                 initials
               )}

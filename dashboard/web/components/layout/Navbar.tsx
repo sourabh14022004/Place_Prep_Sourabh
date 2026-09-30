@@ -83,7 +83,12 @@ export default function Navbar() {
             <img
               src={user.imageUrl}
               alt={user.fullName ?? "Profile"}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
               className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-700 flex items-center justify-center text-white text-xs font-bold">
