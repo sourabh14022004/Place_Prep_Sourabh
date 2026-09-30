@@ -140,12 +140,14 @@ export default function RoadmapBuilder({
   // ── fetch the question pool whenever the company picks or filters change ──
   useEffect(() => {
     if (picked.length === 0) {
-      setPool([]);
-      setPoolTotals({});
-      return;
+      const t0 = setTimeout(() => {
+        setPool([]);
+        setPoolTotals({});
+      }, 0);
+      return () => clearTimeout(t0);
     }
-    setPoolLoading(true);
     const t = setTimeout(() => {
+      setPoolLoading(true);
       getCompanyQuestions({ companies: picked, search: search || undefined, difficulty: difficulty || undefined })
         .then((d) => {
           setPool(d.questions);
@@ -176,7 +178,11 @@ export default function RoadmapBuilder({
   function toggleSelect(id: string) {
     setSelected((s) => {
       const next = new Set(s);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }

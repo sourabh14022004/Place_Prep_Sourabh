@@ -36,7 +36,7 @@ export async function GET(request: Request): Promise<Response> {
     let completions: any[] = [];
     try {
       completions = await QuestionCompletion.find({
-        studentId: user.userId,
+        studentId: toObjectId(user.userId),
       })
         .select('questionId completedAt')
         .lean();

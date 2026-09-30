@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 const IconMap: Record<string, React.ElementType> = {
-  Monitor, Building, Calculator, Users, Zap, GraduationCap, FileText,
+  Monitor, Building, Calculator, Users, Zap, GraduationCap, FileText, Sparkles,
 };
 
 import {
@@ -34,6 +34,7 @@ interface CategoryConfig {
 }
 
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
+  all:             { label: "All Questions",   description: "Complete repository of 22,000+ verified interview questions", iconName: "Sparkles", color: "bg-blue-50/70", borderColor: "border-blue-200", textColor: "text-blue-800" },
   dsa:             { label: "DSA / Coding",   description: "LeetCode-style problems, algorithms & data structures", iconName: "Zap",          color: "bg-blue-50",    borderColor: "border-blue-200",   textColor: "text-blue-700"   },
   aptitude_mcq:    { label: "Aptitude",        description: "Quant, logical reasoning, verbal, and puzzles",         iconName: "Calculator",   color: "bg-slate-50",   borderColor: "border-slate-200",  textColor: "text-slate-700"  },
   core_cs_mcq:     { label: "Core CS",         description: "OS, DBMS, computer networks, OOP fundamentals",         iconName: "Monitor",      color: "bg-purple-50",  borderColor: "border-purple-200", textColor: "text-purple-700" },
@@ -80,6 +81,7 @@ function QuizModal({
   const { data: profileData } = usePlatformProfiles();
   const [picked, setPicked] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(alreadySolved);
+  const [showAnswer, setShowAnswer] = useState(alreadySolved);
   const [completing, setCompleting] = useState(false);
   const [solved, setSolved] = useState(alreadySolved);
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -281,17 +283,33 @@ function QuizModal({
             </div>
           ) : (
             <div className="space-y-4 text-sm text-gray-700">
-              {question.sampleAnswer && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Model Answer</p>
-                  <p className="font-semibold text-gray-800 leading-relaxed whitespace-pre-line">{question.sampleAnswer}</p>
+              {!showAnswer && (question.sampleAnswer || question.explanation) ? (
+                <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-5 text-center space-y-2">
+                  <p className="text-xs font-semibold text-blue-900">Solve mentally or work it out on paper first</p>
+                  <p className="text-xs text-blue-700/80">When you are ready, reveal the model answer and explanation to check your work.</p>
+                  <button
+                    onClick={() => setShowAnswer(true)}
+                    className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-white border border-blue-300 px-4 py-2 rounded-lg hover:bg-blue-50 transition shadow-sm"
+                  >
+                    <BookOpenCheck className="w-4 h-4 text-blue-600" />
+                    Reveal Model Answer & Explanation
+                  </button>
                 </div>
-              )}
-              {question.explanation && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Explanation</p>
-                  <p className="text-gray-600 leading-relaxed whitespace-pre-line">{question.explanation}</p>
-                </div>
+              ) : (
+                <>
+                  {question.sampleAnswer && (
+                    <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4">
+                      <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide mb-1">Model Answer</p>
+                      <p className="font-semibold text-gray-900 leading-relaxed whitespace-pre-line">{question.sampleAnswer}</p>
+                    </div>
+                  )}
+                  {question.explanation && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Explanation</p>
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-line">{question.explanation}</p>
+                    </div>
+                  )}
+                </>
               )}
               {(question.keyPoints?.length ?? 0) > 0 && (
                 <div>
@@ -323,8 +341,12 @@ function QuizModal({
         {/* Footer actions */}
         <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
           {solved ? (
-            <div className="flex items-center gap-2 text-sm font-medium text-green-700">
-              <BookOpenCheck className="w-4 h-4" /> Completed — great job!
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Completed — great job!
+            </div>
+          ) : isMcq ? (
+            <div className="text-xs text-gray-500 font-medium">
+              {!picked ? "Select an option above to answer" : "Click Check Answer to verify"}
             </div>
           ) : isConnected ? (
             <button
@@ -345,24 +367,37 @@ function QuizModal({
               {completing ? "Saving…" : "Mark as Completed"}
             </button>
           )}
+
           <div className="flex-1" />
+
           {isMcq && !submitted && (
             <button
               onClick={handleSubmit}
               disabled={!picked}
-              className="px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
             >
               Check Answer
             </button>
           )}
+
           {isMcq && submitted && !isCorrect && (
             <button
               onClick={handleReset}
-              className="px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+              className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
             >
               Try Again
             </button>
           )}
+
+          {isMcq && submitted && isCorrect && (
+            <button
+              onClick={handleReset}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-100 transition-colors"
+            >
+              Practice Again
+            </button>
+          )}
+
           <button
             onClick={onClose}
             className="px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-100 transition-colors"
@@ -477,13 +512,10 @@ function PracticeContent() {
   const router = useRouter();
 
   const [activeQType, setActiveQType] = useState<string | null>(
-    // DEEP-LINK FIX: /practice?topic=X used to land users on "select a category"
-    // with the topic silently preselected and zero questions loaded. When a
-    // topic/company arrives without an explicit category, open DSA so results
-    // render immediately.
-    searchParams.get("category") ?? (searchParams.get("company") || searchParams.get("topic") ? "dsa" : null)
+    searchParams.get("category") ?? "all"
   );
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
+  const [debouncedSearch, setDebouncedSearch] = useState(search.trim());
   const [company, setCompany] = useState(searchParams.get("company") ?? "");
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
   const [difficulty, setDifficulty] = useState<Difficulty | "">(
@@ -496,11 +528,20 @@ function PracticeContent() {
   const [page, setPage] = useState(1);
   const [activeQuiz, setActiveQuiz] = useState<QuizQuestion | null>(null);
 
+  // Debounce search input so user typing doesn't spam the server
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
   // Sync URL when category changes
   useEffect(() => {
     if (activeQType) {
       const params = new URLSearchParams();
-      params.set("category", activeQType);
+      if (activeQType !== "all") params.set("category", activeQType);
       if (search) params.set("search", search);
       if (company) params.set("company", company);
       if (topic) params.set("topic", topic);
@@ -515,22 +556,34 @@ function PracticeContent() {
   const categories: { questionType: string; count: number }[] =
     Array.isArray(categoriesData) ? categoriesData : [];
 
-  const activeCfg: CategoryConfig | null = activeQType
-    ? (CATEGORY_CONFIG[activeQType] ?? {
-        label: activeQType, description: "", iconName: "HelpCircle",
-        color: "", borderColor: "", textColor: "",
-      })
-    : null;
+  const totalQuestionsCount = useMemo(() => {
+    return categories.reduce((sum, c) => sum + (c.count || 0), 0);
+  }, [categories]);
 
-  // Questions — only fetch when a category is selected
+  const displayCategories = useMemo(() => {
+    if (categories.length === 0) return [];
+    return [
+      { questionType: "all", count: totalQuestionsCount },
+      ...categories,
+    ];
+  }, [categories, totalQuestionsCount]);
+
+  const isAll = activeQType === "all" || !activeQType;
+  const activeCfg: CategoryConfig = (activeQType && CATEGORY_CONFIG[activeQType])
+    ? CATEGORY_CONFIG[activeQType]
+    : CATEGORY_CONFIG.all;
+
+  // Questions — fetched from the server with multi-filter and database-wide search
   const { data: practiceData, isLoading: loadingQuestions, error: errorQuestions, mutate: retryQuestions } = usePractice({
     topic,
     difficulty,
     company,
-    questionType: activeQType ?? undefined,
+    questionType: isAll ? undefined : activeQType,
     isMcq: onlyInteractive ? true : undefined,
+    search: debouncedSearch || undefined,
     page,
-    enabled: activeQType !== null,
+    limit: 50,
+    enabled: true,
   });
 
   const { completedSet, mutate: mutateCompleted } = useCompletedQuestions();
@@ -560,15 +613,13 @@ function PracticeContent() {
     if (onlyUnsolved && completedSet.size >= 0) {
       qs = qs.filter(q => !completedSet.has(String(q.id)));
     }
-    if (!search.trim()) return qs;
-    const lower = search.toLowerCase();
-    return qs.filter(q => q.title?.toLowerCase().includes(lower));
-  }, [allQuestions, search, onlyUnsolved, completedSet]);
+    return qs;
+  }, [allQuestions, onlyUnsolved, completedSet]);
 
   const solvedOnPage = filteredQuestions.filter(q => completedSet.has(String(q.id))).length;
 
   const handleSelectCategory = (qt: string) => {
-    setActiveQType(prev => prev === qt ? null : qt);
+    setActiveQType(prev => (prev === qt && qt !== "all") ? "all" : qt);
     setSearch(""); setCompany(""); setTopic(""); setDifficulty("");
     setPage(1); setActiveQuiz(null);
   };
@@ -593,7 +644,7 @@ function PracticeContent() {
         </div>
       </div>
 
-      {/* Category Grid — dynamic from API */}
+      {/* Category Grid — dynamic from API with 'All Questions' option */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
         {errorCategories ? (
           <div className="col-span-full">
@@ -604,12 +655,12 @@ function PracticeContent() {
             <div key={i} className="h-36 bg-gray-100 rounded-2xl animate-pulse" />
           ))
         ) : (
-          categories.map((cat) => (
+          displayCategories.map((cat) => (
             <CategoryCard
               key={cat.questionType}
               questionType={cat.questionType}
               count={cat.count}
-              active={activeQType === cat.questionType}
+              active={(activeQType === cat.questionType) || (cat.questionType === "all" && isAll)}
               onClick={() => handleSelectCategory(cat.questionType)}
             />
           ))
@@ -769,7 +820,7 @@ function PracticeContent() {
                     className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-blue-50/40 transition-colors cursor-pointer text-left group"
                   >
                     <span className="text-xs text-gray-400 font-mono w-6 shrink-0">
-                      {(page - 1) * 20 + idx + 1}
+                      {(page - 1) * (meta?.limit || 50) + idx + 1}
                     </span>
 
                     {solved ? (
@@ -852,7 +903,7 @@ function PracticeContent() {
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   disabled={page <= 1}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50:bg-slate-800/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" /> Prev
                 </button>
@@ -865,7 +916,7 @@ function PracticeContent() {
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   disabled={page >= meta.totalPages}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-50:bg-slate-800/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold border border-gray-200 rounded-lg bg-white hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Next <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
                 </button>

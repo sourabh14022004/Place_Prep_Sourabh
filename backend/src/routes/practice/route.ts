@@ -78,6 +78,7 @@ export async function GET(request: Request): Promise<Response> {
     const companySlug = searchParams.get('company')      || undefined;
     const isMcqParam  = searchParams.get('isMcq');
     const isMcq       = isMcqParam === 'true' ? true : isMcqParam === 'false' ? false : undefined;
+    const search      = searchParams.get('q') || searchParams.get('search') || undefined;
     const page  = Math.max(1, Number(searchParams.get('page'))  || 1);
     const limit = Math.min(Number(searchParams.get('limit')) || 100, 500);
 
@@ -99,6 +100,7 @@ export async function GET(request: Request): Promise<Response> {
       questionType,
       isMcq,
       companySlug,
+      search,
       page,
       limit,
     });

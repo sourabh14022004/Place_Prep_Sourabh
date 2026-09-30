@@ -11,7 +11,7 @@ export const experienceRepository = {
     verified?: boolean;
     page?: number;
     limit?: number;
-  }): Promise<{ experiences: IInterviewExperience[]; total: number }> {
+  } = {}): Promise<{ experiences: IInterviewExperience[]; total: number }> {
     const filter: Record<string, unknown> = {};
     if (options.companySlug) filter.companySlug = options.companySlug;
     if (options.verified !== undefined) filter.isVerified = options.verified;

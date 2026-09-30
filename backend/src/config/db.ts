@@ -19,9 +19,25 @@ export async function connectDB(): Promise<typeof mongoose> {
     return cachedPromise;
   }
 
-  const uri = process.env.MONGODB_URI;
+  let uri = process.env.MONGODB_URI;
   if (!uri) {
-    throw new Error('[PlacePrep] MONGODB_URI is not defined. Check your .env.local file.');
+    try {
+      // Auto-load env files for standalone scripts/runners
+      const dotenv = require('dotenv');
+      const path = require('node:path');
+      dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
+      dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+      dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+      dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+      dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
+      dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+    } catch {
+      // Ignore if cannot require in certain bundler environments
+    }
+    uri = process.env.MONGODB_URI;
+  }
+  if (!uri) {
+    throw new Error('[PlacePrep] MONGODB_URI is not defined. Check your .env file.');
   }
 
   const options: mongoose.ConnectOptions = {

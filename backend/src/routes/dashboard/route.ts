@@ -46,7 +46,7 @@ export async function GET(request: Request): Promise<Response> {
     // BUG-T1 FIX: For each roadmap, fetch today's questions from the active week.
     // PERF FIX (10k users): completions used to be re-queried PER ROADMAP (N+1 on the
     // hottest endpoint). One indexed query now feeds every roadmap below.
-    const completionDocs = await QuestionCompletion.find({ studentId: user.userId })
+    const completionDocs = await QuestionCompletion.find({ studentId: toObjectId(user.userId) })
       .select('questionId companySlug')
       .lean();
     const completedByCompany = new Map<string, Set<string>>();

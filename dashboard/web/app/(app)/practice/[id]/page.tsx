@@ -67,6 +67,10 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
   const [completing, setCompleting] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [practicingAgain, setPracticingAgain] = useState(false);
+  const [showAnswer, setShowAnswer] = useState(false);
 
   if (isLoading) {
     return (
@@ -88,6 +92,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
 
   const qId = (question._id ?? question.id ?? id).toString();
   const isSolved = completedSet.has(qId);
+  const isAnswerSubmitted = submitted || (isSolved && !practicingAgain);
 
   const title       = question.problemSummary ?? question.title ?? "Untitled";
   const difficulty  = question.difficulty ?? question.diff ?? "Medium";
@@ -118,8 +123,6 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
   // ── Interactive MCQ Quiz State ──
   const hasOptions = Boolean(question.isMcq && Array.isArray(question.options) && question.options.length > 0);
   const options = (question.options as Array<{ label: string; text: string; isCorrect: boolean }>) ?? [];
-  const [picked, setPicked] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(isSolved);
 
   const pickedOption = options.find(o => o.label === picked);
   const isCorrect = pickedOption?.isCorrect ?? false;
@@ -338,7 +341,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
                 <HelpCircle className="w-4 h-4 text-violet-600" />
                 Select Your Answer
               </span>
-              {submitted && (
+              {isAnswerSubmitted && (
                 <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${isCorrect ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
                   {isCorrect ? "✓ Correct" : "✗ Not quite"}
                 </span>
@@ -348,7 +351,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
             <div className="space-y-2.5">
               {options.map((opt) => {
                 const isPicked = picked === opt.label;
-                const answered = submitted;
+                const answered = isAnswerSubmitted;
                 const showCorrect = answered && opt.isCorrect;
                 const showWrong = answered && isPicked && !opt.isCorrect;
                 return (
@@ -381,7 +384,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
             <div className="flex items-center gap-3 pt-2">
-              {!submitted ? (
+              {!isAnswerSubmitted ? (
                 <button
                   onClick={handleSubmitAnswer}
                   disabled={!picked}
@@ -389,7 +392,7 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
                 >
                   Check Answer
                 </button>
-              ) : !isCorrect ? (
+              ) : !isCorrect && !isSolved ? (
                 <button
                   onClick={handleResetAnswer}
                   className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
@@ -397,9 +400,21 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
                   Try Again
                 </button>
               ) : (
-                <div className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  Great job! Solved correctly on PlacePrep.
+                <div className="flex items-center gap-3">
+                  <div className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    Great job! Solved correctly on PlacePrep.
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPracticingAgain(true);
+                      setSubmitted(false);
+                      setPicked(null);
+                    }}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 shadow-sm transition"
+                  >
+                    Practice Again
+                  </button>
                 </div>
               )}
             </div>
@@ -507,15 +522,32 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
           </Section>
         )}
 
+        {/* ── Problem Solving Callout for conceptual/written/quant questions ── */}
+        {!hasOptions && !isSolved && !showAnswer && (sampleAns || explanation) && (
+          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-5 text-center space-y-2">
+            <h4 className="text-sm font-bold text-blue-950">Solve this question first</h4>
+            <p className="text-xs text-blue-700/80 max-w-lg mx-auto leading-relaxed">
+              Work out your answer or notes before checking the solution. Once ready, reveal the model answer and explanation to evaluate yourself.
+            </p>
+            <button
+              onClick={() => setShowAnswer(true)}
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-blue-700 bg-white border border-blue-300 hover:bg-blue-50 shadow-sm transition active:scale-95"
+            >
+              <Lightbulb className="w-4 h-4 text-blue-600" />
+              Reveal Model Answer &amp; Explanation
+            </button>
+          </div>
+        )}
+
         {/* ── Sample Answer ── */}
-        {sampleAns && (
+        {sampleAns && (hasOptions || isSolved || showAnswer) && (
           <Section title="Sample Answer" icon={CheckCircle} defaultOpen>
             <p className="whitespace-pre-wrap text-gray-700">{sampleAns}</p>
           </Section>
         )}
 
         {/* ── Explanation ── */}
-        {explanation && (!hasOptions || submitted) && (
+        {explanation && (hasOptions ? isAnswerSubmitted : (isSolved || showAnswer)) && (
           <Section title="Explanation" icon={Lightbulb} defaultOpen>
             <p className="whitespace-pre-wrap text-gray-700">{explanation}</p>
           </Section>

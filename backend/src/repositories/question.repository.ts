@@ -14,6 +14,7 @@ export const questionRepository = {
     roundType?: string;
     questionType?: string;
     isMcq?: boolean;
+    search?: string;
     minFrequency?: number;  // BUG-R4 FIX: frequency threshold filter
     targetRole?: string;    // Phase 2: filter by role (array-contains match on targetRoles[])
     excludeIds?: string[];  // exclude already-assigned question IDs (prevents cross-week duplicates)
@@ -31,6 +32,11 @@ export const questionRepository = {
     if (filter.companySlug) query.companySlug = filter.companySlug;
     if (filter.companyId) query.companyId = new mongoose.Types.ObjectId(filter.companyId);
     if (filter.difficulty) query.difficulty = filter.difficulty;
+    if (filter.search?.trim()) {
+      const escaped = filter.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
+      query.$or = [{ problemSummary: searchRegex }, { topics: searchRegex }];
+    }
     if (filter.roundType) {
       if (filter.roundType.includes(',')) {
         query.roundType = { $in: filter.roundType.split(',').map(r => r.trim()) };

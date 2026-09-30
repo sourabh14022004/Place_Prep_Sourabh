@@ -9,19 +9,27 @@ export const updateProfileSchema = z.object({
   linkedinUrl: z
     .string()
     .optional()
-    .refine(
-      (val) => !val || val.trim() === '' || /^https?:\/\/.+/.test(val),
-      { message: 'Invalid LinkedIn URL' }
-    )
-    .transform((val) => (val && val.trim() === '' ? undefined : val)),
+    .nullable()
+    .transform((val) => {
+      if (!val || val.trim() === '') return '';
+      const v = val.trim();
+      if (/^https?:\/\//i.test(v)) return v;
+      if (/^linkedin\.com/i.test(v)) return `https://${v}`;
+      if (/^[a-zA-Z0-9_\-\.]+$/.test(v)) return `https://linkedin.com/in/${v.replace(/^@/, '')}`;
+      return `https://${v}`;
+    }),
   githubUrl: z
     .string()
     .optional()
-    .refine(
-      (val) => !val || val.trim() === '' || /^https?:\/\/.+/.test(val),
-      { message: 'Invalid GitHub URL' }
-    )
-    .transform((val) => (val && val.trim() === '' ? undefined : val)),
+    .nullable()
+    .transform((val) => {
+      if (!val || val.trim() === '') return '';
+      const v = val.trim();
+      if (/^https?:\/\//i.test(v)) return v;
+      if (/^github\.com/i.test(v)) return `https://${v}`;
+      if (/^[a-zA-Z0-9_\-\.]+$/.test(v)) return `https://github.com/${v.replace(/^@/, '')}`;
+      return `https://${v}`;
+    }),
   year: z.enum(['1st', '2nd', '3rd', '4th']).optional(),
   branch: z.string().min(2).trim().optional(),
   bio: z.string().max(500).optional(),

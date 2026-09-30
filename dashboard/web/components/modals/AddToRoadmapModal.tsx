@@ -40,7 +40,9 @@ export default function AddToRoadmapModal({ company, onClose, onAdded }: Props) 
   useEffect(() => {
     if (!company) return;
     let cancelled = false;
-    setLoadingTopics(true);
+    const t = setTimeout(() => {
+      if (!cancelled) setLoadingTopics(true);
+    }, 0);
     fetch(`/api/companies/${company.slug}/topics?role=${encodeURIComponent(role)}`, {
       credentials: "include",
     })
@@ -57,7 +59,10 @@ export default function AddToRoadmapModal({ company, onClose, onAdded }: Props) 
       })
       .catch(() => { if (!cancelled) setTopics([]); })
       .finally(() => { if (!cancelled) setLoadingTopics(false); });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [role, company]);
 
   useEffect(() => {
@@ -84,8 +89,9 @@ export default function AddToRoadmapModal({ company, onClose, onAdded }: Props) 
         onAdded(company.slug);
         onClose();
       }, 1200);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to add company to roadmap. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to add company to roadmap. Please try again.";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

@@ -385,6 +385,7 @@ export function usePractice(filters: {
   roundType?: string;
   questionType?: string;
   isMcq?: boolean;
+  search?: string;
   page?: number;
   limit?: number;
   enabled?: boolean;
@@ -396,6 +397,7 @@ export function usePractice(filters: {
   if (filters.roundType) qs.append("roundType", filters.roundType);
   if (filters.questionType) qs.append("questionType", filters.questionType);
   if (filters.isMcq !== undefined) qs.append("isMcq", String(filters.isMcq));
+  if (filters.search) qs.append("search", filters.search);
   if (filters.page) qs.append("page", String(filters.page));
   if (filters.limit) qs.append("limit", String(filters.limit));
 

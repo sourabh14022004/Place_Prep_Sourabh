@@ -168,6 +168,20 @@ export const studentService = {
         }
       }
     }
+    if (flatData.linkedinUrl === '') {
+      await StudentProfile.findOneAndUpdate(
+        { userId: new mongoose.Types.ObjectId(userId) },
+        { $unset: { linkedinUrl: '' } }
+      );
+      delete flatData.linkedinUrl;
+    }
+    if (flatData.githubUrl === '') {
+      await StudentProfile.findOneAndUpdate(
+        { userId: new mongoose.Types.ObjectId(userId) },
+        { $unset: { githubUrl: '' } }
+      );
+      delete flatData.githubUrl;
+    }
     const profile = await studentRepository.updateByUserId(userId, flatData as any);
     if (!profile) throw ApiError.notFound('Student profile');
     return profile;

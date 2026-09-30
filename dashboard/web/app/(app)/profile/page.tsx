@@ -50,15 +50,15 @@ const PREP_WEEKS = [4, 6, 8, 12] as const;
 
 const defaultUser = {
  bestStreak: 0,
- name: "Pranay Sarkar",
- initials: "PS",
- email: "pranay.sarkar@nst.edu",
- roll: "2201CS42",
- branch: "CS-AI",
- batch: "2023",
- bio: "Targeting MAANG SDE-1 roles. Passionate about distributed systems and DSA.",
- linkedin: "linkedin.com/in/pranaysarkar",
- github: "github.com/pranaysarkar",
+ name: "Student",
+ initials: "ST",
+ email: "",
+ roll: "",
+ branch: "CS",
+ batch: "2024",
+ bio: "",
+ linkedin: "",
+ github: "",
  // Career settings
  categories: ["MAANG", "Product"] as CompanyCategory[],
  targetCompanies: ["Google", "Amazon", "Flipkart"],
@@ -66,16 +66,12 @@ const defaultUser = {
  prepWeeks: 8,
  skillRatings: { dsa: 6, sysdesign: 4, lld: 3, os: 5, dbms: 5, behavioral: 7 } as Record<string, number>,
  // Stats
- xp: 1240,
- rank: 42,
- streak: 14,
- solved: { easy: 52, medium: 67, hard: 9 },
- badges: ["5-Day Streak", "First Solve", "Problem Master", "Speed Coder"],
- companyReadiness: [
-  { name: "Google",  pct: 45, logo: "https://www.google.com/favicon.ico" },
-  { name: "Amazon",  pct: 70, logo: "https://www.amazon.com/favicon.ico" },
-  { name: "Flipkart", pct: 20, logo: "https://www.flipkart.com/favicon.ico" },
- ],
+ xp: 0,
+ rank: null as number | null,
+ streak: 0,
+ solved: { easy: 0, medium: 0, hard: 0 },
+ badges: [] as string[],
+ companyReadiness: [] as Array<{ name: string; pct: number; logo: string }>,
  avatarUrl: null as string | null,
 };
 
@@ -299,37 +295,68 @@ function SkillSlider({ label, value, onChange }: { label: string; value: number;
 
 // ── Tab 1: Overview ───────────────────────────────────
 function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
- const [bio, setBio] = useState(user.bio);
- const [linkedin, setLinkedin] = useState(user.linkedin);
- const [github, setGithub] = useState(user.github);
- const [editing, setEditing] = useState(false);
- const [saved, setSaved] = useState(false);
+ const [bio, setBio] = useState(user.bio || "");
+ const [linkedin, setLinkedin] = useState(user.linkedin || "");
+ const [github, setGithub] = useState(user.github || "");
+ const [editingAbout, setEditingAbout] = useState(false);
+ const [editingSocials, setEditingSocials] = useState(false);
+ const [savingAbout, setSavingAbout] = useState(false);
+ const [savingSocials, setSavingSocials] = useState(false);
  const [isUploading, setIsUploading] = useState(false);
 
- const handleSave = async () => {
+ useEffect(() => {
+  setBio(user.bio || "");
+  setLinkedin(user.linkedin || "");
+  setGithub(user.github || "");
+ }, [user.bio, user.linkedin, user.github]);
+
+ const handleSaveAbout = async () => {
+  setSavingAbout(true);
   try {
-   // Normalize URLs: validator requires https:// prefix
-   const normalizeUrl = (val: string, domain: string) => {
+   await updateProfile({ bio });
+   setEditingAbout(false);
+   toast.success("About updated successfully!");
+  } catch (err: any) {
+   const msg = err?.message || 'Failed to update bio.';
+   toast.error(msg);
+  } finally {
+   setSavingAbout(false);
+  }
+ };
+
+ const handleSaveSocials = async () => {
+  setSavingSocials(true);
+  try {
+   const normalizeUrl = (val: string, platform: 'linkedin' | 'github') => {
     if (!val || val.trim() === '') return '';
     const v = val.trim();
-    if (v.startsWith('https://')) return v;
-    if (v.startsWith('http://')) return v.replace('http://', 'https://');
-    return `https://${v}`;
+    if (v.startsWith('http://') || v.startsWith('https://')) return v;
+    if (platform === 'linkedin') {
+      if (v.startsWith('linkedin.com')) return `https://${v}`;
+      return `https://linkedin.com/in/${v.replace(/^@/, '')}`;
+    } else {
+      if (v.startsWith('github.com')) return `https://${v}`;
+      return `https://github.com/${v.replace(/^@/, '')}`;
+    }
    };
+
+   const cleanLinkedin = normalizeUrl(linkedin, 'linkedin');
+   const cleanGithub = normalizeUrl(github, 'github');
+
    await updateProfile({
-    bio,
-    linkedinUrl: normalizeUrl(linkedin, 'linkedin'),
-    githubUrl: normalizeUrl(github, 'github'),
+    linkedinUrl: cleanLinkedin,
+    githubUrl: cleanGithub,
    });
-   setEditing(false);
-   setSaved(true);
-   setTimeout(() => setSaved(false), 2000);
+
+   setLinkedin(cleanLinkedin);
+   setGithub(cleanGithub);
+   setEditingSocials(false);
+   toast.success("Social links updated!");
   } catch (err: any) {
-   // BUG-B FIX: Show user-visible error — previously only console.error
-   const msg = err?.message || 'Failed to update profile. Please try again.';
+   const msg = err?.message || 'Failed to update social links.';
    toast.error(msg);
-   console.error("Failed to update profile", err);
-   // Keep editing=true so user can retry (don't close the form on failure)
+  } finally {
+   setSavingSocials(false);
   }
  };
 
@@ -394,7 +421,7 @@ function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
        </div>
 
        <button
-        onClick={() => setEditing(true)}
+        onClick={() => setEditingAbout(true)}
         className="mt-5 w-full border border-gray-300 text-gray-700 text-sm font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
        >
         <Edit2 className="w-3.5 h-3.5" /> Edit Profile
@@ -405,21 +432,21 @@ function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
       <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
        <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-gray-900">About</h3>
-        {!editing ? (
-         <button onClick={() => setEditing(true)} className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1">
+        {!editingAbout ? (
+         <button onClick={() => setEditingAbout(true)} className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1">
           <Edit2 className="w-3.5 h-3.5" /> Edit
          </button>
         ) : (
          <div className="flex gap-2">
-          <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
-          <button onClick={handleSave} className="flex items-center gap-1 bg-blue-600 text-white text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-700">
-           <Save className="w-3 h-3" /> Save
+          <button onClick={() => setEditingAbout(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+          <button onClick={handleSaveAbout} disabled={savingAbout} className="flex items-center gap-1 bg-blue-600 text-white text-xs font-semibold px-2.5 py-1 rounded-lg hover:bg-blue-700 disabled:opacity-60">
+           {savingAbout ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
           </button>
          </div>
         )}
        </div>
 
-       {editing ? (
+       {editingAbout ? (
         <textarea
          value={bio}
          onChange={(e) => setBio(e.target.value.slice(0, 140))}
@@ -431,37 +458,157 @@ function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
        ) : (
         <p className="text-sm text-gray-600 leading-relaxed">{bio || <span className="text-gray-400 italic">No bio added yet.</span>}</p>
        )}
-       {editing && <p className="text-xs text-gray-400 mt-1 text-right">{bio.length}/140</p>}
-
-       {saved && (
-        <div className="mt-3 flex items-center gap-2 text-green-600 text-sm bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-         <Check className="w-4 h-4" /> Profile updated successfully
-        </div>
-       )}
+       {editingAbout && <p className="text-xs text-gray-400 mt-1 text-right">{bio.length}/140</p>}
       </div>
 
       {/* Social Links */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-       <h3 className="font-semibold text-gray-900 mb-3">Social Links</h3>
-       <div className="space-y-3">
-        {[
-         { icon: Globe,   label: "LinkedIn", value: linkedin, setValue: setLinkedin, placeholder: "linkedin.com/in/yourname" },
-         { icon: GitBranch, label: "GitHub",  value: github,  setValue: setGithub,  placeholder: "github.com/yourusername" },
-        ].map(({ icon: Icon, label, value, setValue, placeholder }) => (
-         <div key={label} className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-           <Icon className="w-4 h-4 text-gray-600" />
-          </div>
+       <div className="flex items-center justify-between mb-3">
+        <div>
+         <h3 className="font-semibold text-gray-900">Social Links</h3>
+         <p className="text-xs text-gray-500">Connect your profiles to showcase on your portfolio.</p>
+        </div>
+        {!editingSocials ? (
+         <button
+          onClick={() => setEditingSocials(true)}
+          className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-blue-100 transition-colors"
+         >
+          <Edit2 className="w-3.5 h-3.5" />
+          {linkedin || github ? "Edit" : "Connect"}
+         </button>
+        ) : (
+         <div className="flex items-center gap-2">
+          <button
+           onClick={() => {
+            setLinkedin(user.linkedin || "");
+            setGithub(user.github || "");
+            setEditingSocials(false);
+           }}
+           disabled={savingSocials}
+           className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+          >
+           Cancel
+          </button>
+          <button
+           onClick={handleSaveSocials}
+           disabled={savingSocials}
+           className="flex items-center gap-1.5 bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors shadow-sm"
+          >
+           {savingSocials ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+           Save
+          </button>
+         </div>
+        )}
+       </div>
+
+       {editingSocials ? (
+        <div className="space-y-3 pt-1">
+         <div>
+          <label className="text-xs font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+           <Globe className="w-3.5 h-3.5 text-blue-600" />
+           LinkedIn
+          </label>
           <input
            type="text"
-           value={value}
-           onChange={(e) => setValue(e.target.value)}
-           placeholder={placeholder}
-           className="flex-1 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+           value={linkedin}
+           onChange={(e) => setLinkedin(e.target.value)}
+           placeholder="e.g. linkedin.com/in/yourname or username"
+           className="w-full text-sm text-gray-800 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
           />
          </div>
-        ))}
-       </div>
+
+         <div>
+          <label className="text-xs font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+           <GitBranch className="w-3.5 h-3.5 text-gray-800" />
+           GitHub
+          </label>
+          <input
+           type="text"
+           value={github}
+           onChange={(e) => setGithub(e.target.value)}
+           placeholder="e.g. github.com/yourusername or username"
+           className="w-full text-sm text-gray-800 border border-gray-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50/50"
+          />
+         </div>
+         <p className="text-[11px] text-gray-400">Enter your full profile URL or username. Clear the input to disconnect.</p>
+        </div>
+       ) : (
+        <div className="space-y-2.5 pt-1">
+         {/* LinkedIn row */}
+         <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 transition-colors">
+          <div className="flex items-center gap-3 min-w-0">
+           <div className="w-9 h-9 bg-blue-100/70 text-blue-700 rounded-lg flex items-center justify-center shrink-0">
+            <Globe className="w-4 h-4" />
+           </div>
+           <div className="min-w-0">
+            <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">LinkedIn</div>
+            <div className="text-sm font-semibold text-gray-800 truncate">
+             {linkedin ? (
+              linkedin.replace(/^https?:\/\/(www\.)?/, '')
+             ) : (
+              <span className="text-gray-400 font-normal italic">Not connected</span>
+             )}
+            </div>
+           </div>
+          </div>
+          {linkedin ? (
+           <a
+            href={linkedin.startsWith('http') ? linkedin : `https://${linkedin}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-2.5 py-1.5 rounded-lg shadow-sm shrink-0"
+           >
+            <span>Open</span>
+            <ExternalLink className="w-3 h-3" />
+           </a>
+          ) : (
+           <button
+            onClick={() => setEditingSocials(true)}
+            className="text-xs font-semibold text-blue-600 hover:underline shrink-0"
+           >
+            + Connect
+           </button>
+          )}
+         </div>
+
+         {/* GitHub row */}
+         <div className="flex items-center justify-between p-3 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-gray-50 transition-colors">
+          <div className="flex items-center gap-3 min-w-0">
+           <div className="w-9 h-9 bg-gray-200/70 text-gray-800 rounded-lg flex items-center justify-center shrink-0">
+            <GitBranch className="w-4 h-4" />
+           </div>
+           <div className="min-w-0">
+            <div className="text-xs font-medium text-gray-400 uppercase tracking-wide">GitHub</div>
+            <div className="text-sm font-semibold text-gray-800 truncate">
+             {github ? (
+              github.replace(/^https?:\/\/(www\.)?/, '')
+             ) : (
+              <span className="text-gray-400 font-normal italic">Not connected</span>
+             )}
+            </div>
+           </div>
+          </div>
+          {github ? (
+           <a
+            href={github.startsWith('http') ? github : `https://${github}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-gray-800 hover:text-gray-950 bg-white border border-gray-200 px-2.5 py-1.5 rounded-lg shadow-sm shrink-0"
+           >
+            <span>Open</span>
+            <ExternalLink className="w-3 h-3" />
+           </a>
+          ) : (
+           <button
+            onClick={() => setEditingSocials(true)}
+            className="text-xs font-semibold text-blue-600 hover:underline shrink-0"
+           >
+            + Connect
+           </button>
+          )}
+         </div>
+        </div>
+       )}
       </div>
      </div>
 
@@ -492,11 +639,12 @@ function OverviewTab({ user, onEdit }: { user: any; onEdit: () => void }) {
         </div>
         <div className="flex-1 min-w-0">
          <div className="text-sm font-bold text-blue-950">Shareable Profile</div>
-         <div className="text-xs text-blue-600 truncate font-medium mt-0.5">placeprep.nst.edu/u/{user.roll || user.name?.toLowerCase().replace(/\s+/g, "") || "pranaysarkar"}</div>
+         <div className="text-xs text-blue-600 truncate font-medium mt-0.5">placeprep.nst.edu/u/{user.roll || user.name?.toLowerCase().replace(/\s+/g, "") || "student"}</div>
         </div>
         <button
          onClick={() => {
-          navigator.clipboard?.writeText(`https://placeprep.nst.edu/u/${user.roll || "pranaysarkar"}`);
+          const profileSlug = user.roll || user.name?.toLowerCase().replace(/\s+/g, "") || "student";
+          navigator.clipboard?.writeText(`https://placeprep.nst.edu/u/${profileSlug}`);
           toast.success("Profile link copied!");
          }}
          className="shrink-0 text-xs font-bold text-blue-700 bg-white border border-blue-300/80 px-4 py-2 rounded-xl hover:bg-blue-50 transition-colors shadow-sm active:scale-95"

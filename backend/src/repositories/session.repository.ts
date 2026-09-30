@@ -28,7 +28,7 @@ export const sessionRepository = {
     return SessionBooking.findById(id).lean<ISessionBooking>();
   },
 
-  async findAll(options: { page?: number; limit?: number }): Promise<{
+  async findAll(options: { page?: number; limit?: number } = {}): Promise<{
     sessions: ISessionBooking[];
     total: number;
   }> {
