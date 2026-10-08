@@ -1,60 +1,32 @@
-# Docs
+# Documentation & Reference
 
-Project documentation, research notes, audit reports, and analysis outputs.
+Project documentation, research notes, audit reports, and technical decision records for the PlacePrep platform.
 
-## Structure
+---
+
+## Directory Overview
 
 ```
 docs/
-├── source_audit.md          # Week 1 — scrapability, ToS, robots.txt findings per source
-├── data_dictionary.md       # Field definitions and allowed values
-├── architecture.md          # Full system architecture with diagrams
-├── weekly_updates/
-│   ├── week1.md
-│   ├── week2.md
-│   └── ...
-├── gap_analysis/
-│   ├── methodology.md       # How gap analysis is computed
-│   └── findings.md          # Results — industry vs syllabus comparison
-└── decisions/
-    ├── schema_v1.md         # Why we chose this schema
-    └── tech_stack.md        # Tech stack decisions and trade-offs
+├── source_audit.md          # Scrapability, ToS, and robots.txt analysis across sources
+├── data_dictionary.md       # Entity definitions, field types, and taxonomies
+├── architecture.md          # Architectural evolution: Merged portals & Express API
+├── gap_analysis/            # Methodology & findings for B.Tech CS & AI curriculum alignment
+│   ├── methodology.md       # Gap computation (Industry frequency vs Course syllabus)
+│   └── findings.md          # Identified curriculum gaps and high-priority skills
+└── decisions/               # Architecture Decision Records (ADRs)
+    ├── single_origin_merge.md # Transition from 3 individual portals to 1 unified web app
+    └── live_solve_verify.md  # Competitive platform solve verification design
 ```
 
-## Key Documents
+---
 
-### `source_audit.md`
-Produced in Week 1. For each data source documents:
-- Is it scrapable? (Yes / Partial / No)
-- ToS and robots.txt status
-- Data quality assessment
-- Estimated record count
-- Recommended scraping approach
+## Key References in the Repository
 
-### `data_dictionary.md`
-Canonical definitions for every field in the schema:
-
-| Field | Type | Allowed Values | Notes |
-|-------|------|---------------|-------|
-| `round_type` | enum | coding, system_design, hr, managerial | |
-| `difficulty` | enum | Easy, Medium, Hard | null if not available |
-| `tier` | enum | FAANG, Product, Service, Startup | company classification |
-| `coverage_depth` | enum | Introductory, Intermediate, Advanced | syllabus only |
-
-### `gap_analysis/findings.md`
-Output of Use Case 2 analysis:
-- Topics that appear in 30%+ of company interviews but have low syllabus coverage
-- Topics with high syllabus coverage but low industry frequency
-- Per-course alignment scores
-
-## Weekly Updates
-
-Each week, add a brief update to `weekly_updates/weekN.md` covering:
-- What was completed
-- Blockers encountered
-- Data quality observations
-- Decisions made
-
-## Contributing to Docs
-
-If you discover something important about a data source, an edge case in the schema, or a decision that was made — document it here. Future team members will thank you.
+- Root Architecture & Setup: [`README.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/README.md)
+- Web Application Guide: [`dashboard/web/README.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/dashboard/web/README.md)
+- Backend & API Reference: [`backend/README.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/README.md)
+- Database Models: [`schema/README.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/schema/README.md)
+- Scraper Registry: [`pipeline/SOURCE-REGISTRY.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/pipeline/SOURCE-REGISTRY.md)
+- System Audit Notes: [`AUDIT-NOTES.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/AUDIT-NOTES.md)
+- Comprehensive Spec: [`PlacePrep-Vibe-Coding-Docs.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/PlacePrep-Vibe-Coding-Docs.md)

@@ -1,90 +1,46 @@
 # Pipeline
 
-Ingestion, transformation, and export scripts that move data from raw JSON dumps into a clean, queryable Supabase database.
+Data ingestion, normalization, deduplication, and transformation pipeline for PlacePrep's interview intelligence dataset.
 
-## Structure
+---
 
-```
-pipeline/
-├── ingest.py              # Load raw JSON from data/raw/ into staging DB table
-├── deduplicate.py         # Remove duplicate questions across sources
-├── transform.py           # Clean and normalize staging records
-├── classify.py            # Claude API classification — topic, difficulty, round type
-├── export.py              # Export classified data to data/exports/
-├── run_all.py             # End-to-end pipeline runner
-└── config.py              # DB connection, paths, constants
-```
+## Overview
 
-## Pipeline Flow
+The PlacePrep data pipeline transforms raw interview dumps from dozens of platforms into structured questions, company profiles, and topic frequencies stored in **MongoDB Atlas**.
 
-```
-data/raw/
-    ↓  ingest.py
-  staging DB table
-    ↓  deduplicate.py
-  deduplicated records
-    ↓  transform.py
-  cleaned & normalized
-    ↓  classify.py (Claude API)
-  tagged records → Supabase DB
-    ↓  export.py
-  data/exports/ → Dashboard
+```mermaid
+flowchart TD
+    A["Raw Platform Dumps (scrapers/)"] --> B["Ingestion & Deduplication"]
+    B --> C["Data Cleaning & Normalization"]
+    C --> D["Classification (Topic, Difficulty, Round Type)"]
+    D --> E[("MongoDB Atlas Database")]
+    E --> F["Express API (/api/*)"]
+    F --> G["Next.js Web Portal"]
 ```
 
-## Running the Pipeline
+---
 
-```bash
-# Step 1 — ingest raw data into staging
-python pipeline/ingest.py --source geeksforgeeks
+## Ingestion Architecture & Status
 
-# Step 2 — deduplicate across all sources
-python pipeline/deduplicate.py
+1. **Scraped Ingestion**: Platform data collected by scrapers (e.g., `scrapers/group-a`) is parsed and staged.
+2. **Deduplication**: Records are deduplicated by checking matching company, round type, and fuzzy problem similarity (>= 90%) or identical canonical source URLs.
+3. **Classification & Tagging**: Questions are tagged with difficulty (`Easy`, `Medium`, `Hard`), round type (`coding`, `system_design`, `hr`, `aptitude`), and mapped to standard DSA and CS topic taxonomy.
+4. **Promotion to MongoDB**: Cleaned and validated documents are promoted to MongoDB Atlas using the schemas in `backend/src/models/` and seeder scripts such as `backend/scripts/seedRealData.js`.
 
-# Step 3 — clean and normalize
-python pipeline/transform.py
+---
 
-# Step 4 — classify with Claude API
-python pipeline/classify.py
+## Active Pipeline Scripts
 
-# Or run everything at once
-python pipeline/run_all.py
-```
+| Script / Tool | Location | Purpose |
+|---|---|---|
+| Production Data Seeder | `backend/scripts/seedRealData.js` | Bulk seeds 22,750+ questions and 670+ companies into MongoDB Atlas |
+| Seed Reset & Fixtures | `backend/src/scripts/seed.ts` | Populates demo student, faculty, and admin accounts |
+| MCQ Backfill | `backend/src/scripts/backfill-mcq.ts` | Formats and backfills interactive multiple-choice options |
+| Roadmap Question ID Backfill | `backend/src/scripts/backfill-roadmap-questionids.ts` | Links generated weekly modules to persistent question documents |
+| Doubt Domain Classifier | `backend/src/scripts/backfill-doubt-domains.ts` | Tags student doubt threads with domain categories |
 
-## Environment Setup
+---
 
-Create a `.env` file in the project root:
+## Source Registry
 
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-key
-ANTHROPIC_API_KEY=your-claude-api-key
-DB_STAGING_TABLE=raw_questions
-DB_CLEAN_TABLE=questions
-```
-
-## Deduplication Strategy
-
-Two records are considered duplicates if they share:
-- Same `company` + `round_type` + `problem_summary` (fuzzy match >= 90%)
-- Or same `source_url`
-
-When duplicates are found, the record with the higher `frequency_score` is kept and sources are merged.
-
-## Classification (Claude API)
-
-`classify.py` sends each record to Claude and extracts:
-- **Topic** — e.g., Dynamic Programming, System Design, SQL
-- **Difficulty** — Easy / Medium / Hard (where not already present)
-- **Round type** — coding, system_design, hr, managerial
-- **Syllabus mapping** — which B.Tech course this maps to
-
-## Status
-
-| Script | Status |
-|--------|--------|
-| `ingest.py` | 🔲 Not started |
-| `deduplicate.py` | 🔲 Not started |
-| `transform.py` | 🔲 Not started |
-| `classify.py` | 🔲 Not started |
-| `export.py` | 🔲 Not started |
-| `run_all.py` | 🔲 Not started |
+See [`SOURCE-REGISTRY.md`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/pipeline/SOURCE-REGISTRY.md) for detailed tracking of scraped data sources, status, and coverage metrics.

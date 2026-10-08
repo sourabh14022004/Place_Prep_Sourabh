@@ -1,60 +1,35 @@
 # Data
 
-Storage for all raw and processed datasets at every stage of the pipeline.
+Storage and metadata for PlacePrep datasets at various stages of extraction, normalization, and promotion.
 
-## Structure
+---
+
+## Directory Organization
 
 ```
 data/
-├── raw/                   # Unmodified scraper output (JSON)
-│   ├── geeksforgeeks/
-│   ├── leetcode/
-│   ├── interviewbit/
-│   ├── ambitionbox/
-│   ├── glassdoor/
-│   └── ...
-├── staging/               # Lightly cleaned, merged dumps pre-DB load
-├── processed/             # Cleaned, normalized, schema-conformant records
-├── classified/            # Records tagged with topic, difficulty, round type
-└── exports/               # Final exports for dashboard consumption
+├── filtered-output/         # Curated, normalized datasets & execution reports
+│   ├── companies.json       # Cleaned company profiles with round structures
+│   ├── questions.json       # Normalized question pool with topic tags
+│   └── report.md            # Ingestion metrics and quality audit report
+└── raw/                     # (Gitignored) Raw platform scrapes and dumps
 ```
+
+---
 
 ## Data Lifecycle
 
 ```
-scrapers/ → data/raw/ → data/staging/ → data/processed/ → data/classified/ → Supabase DB
+scrapers/ → raw/ → filtered-output/ → MongoDB Atlas Database → PlacePrep API
 ```
 
-| Folder | Stage | Who writes here |
-|--------|-------|----------------|
-| `raw/` | Post-scrape | Scrapers |
-| `staging/` | Post-merge | Ingestion pipeline |
-| `processed/` | Post-cleaning | Transformation scripts |
-| `classified/` | Post-AI tagging | Claude API classification |
-| `exports/` | Pre-dashboard | Export scripts |
+1. **Extraction**: Source scrapers dump platform records into temporary staging.
+2. **Filtering & Deduplication**: Outliers, duplicates, and malformed entries are filtered into `filtered-output/`.
+3. **Promotion**: Validated datasets are bulk-loaded into MongoDB Atlas using `backend/scripts/seedRealData.js`.
 
-## Schema (Processed Records)
+---
 
-Each record in `processed/` and `classified/` conforms to:
+## Data Policy
 
-```json
-{
-  "id": "uuid",
-  "company": "Google",
-  "role": "SDE-1",
-  "round_type": "coding | system_design | hr | managerial",
-  "topic": "Dynamic Programming",
-  "problem_summary": "Given an array...",
-  "difficulty": "Easy | Medium | Hard",
-  "source": "geeksforgeeks",
-  "source_url": "https://...",
-  "scraped_at": "2025-06-09T10:00:00Z",
-  "frequency_score": 0.73
-}
-```
-
-## Important Notes
-
-- **Do not commit large data files.** Raw dumps can be large — store in cloud storage (Supabase Storage / Google Drive) and add to `.gitignore`.
-- `data/raw/` is in `.gitignore` by default. Only commit small sample files for testing.
-- Always preserve original raw files — never modify `raw/` in place.
+- **Version Control**: Large raw data files are excluded via `.gitignore` to keep repository size lean.
+- **Integrity**: Standardized JSON schemas are validated against Mongoose models before insertion.

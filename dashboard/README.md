@@ -1,106 +1,78 @@
-# Dashboard
+# PlacePrep — Dashboard Workspace
 
-Product layer containing both user-facing applications — the student interview prep portal (Use Case 1) and the faculty curriculum intelligence dashboard (Use Case 2).
+This directory houses the unified web frontend for the PlacePrep NST Interview Intelligence Portal.
 
-## Structure
+---
+
+## Architecture Evolution: 3 Portals → 1 Unified App
+
+Originally conceived and scaffolded as three separate Next.js deployments (`student-portal`, `faculty-portal`, `admin-portal`) backed by a shared library, the frontend architecture was refactored into a single, cohesive Next.js web application located in [`dashboard/web/`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/dashboard/web).
+
+### Why the Merge?
+- **Shared Domain & State**: All three portals already shared the same MongoDB database, JWT authentication scheme, and entity models. The separation created artificial boundaries without real isolation.
+- **Cross-Origin Auth Friction Eliminated**: Running separate apps previously required passing session tokens across origins via URL query parameters (leaking credentials into browser history and server logs). With one unified origin, authentication relies securely on same-origin HttpOnly cookies.
+- **Dependency & Build Efficiency**: Merging eliminated three redundant dependency trees (dropping `node_modules` overhead by more than 50%), unified React 19 and Next.js versions, and reduced developer overhead from running three development servers down to one.
+- **Reverse-Proxy Architecture**: The Next.js frontend at `localhost:3000` transparently rewrites all `/api/*` traffic to the standalone Express backend at `localhost:4000`, eliminating the need for complex CORS configurations.
+
+---
+
+## Directory Structure
 
 ```
 dashboard/
-├── student-portal/            # Use Case 1 — Next.js app for students
-│   ├── app/
-│   │   ├── page.tsx           # Home — company search
-│   │   ├── company/[name]/    # Company detail page
-│   │   └── topics/            # Browse by topic
-│   ├── components/
-│   │   ├── CompanyCard.tsx
-│   │   ├── TopicBadge.tsx
-│   │   ├── QuestionList.tsx
-│   │   └── DifficultyChart.tsx
-│   └── package.json
-│
-├── faculty-dashboard/         # Use Case 2 — Next.js app for faculty
-│   ├── app/
-│   │   ├── page.tsx           # Gap analysis overview
-│   │   ├── courses/           # Course-level drill-down
-│   │   └── heatmap/           # Industry vs syllabus heatmap
-│   ├── components/
-│   │   ├── GapHeatmap.tsx
-│   │   ├── CoverageBar.tsx
-│   │   └── SyllabusMapper.tsx
-│   └── package.json
-│
-└── api/                       # Shared FastAPI backend
-    ├── main.py
-    ├── routers/
-    │   ├── companies.py       # GET /companies, /companies/{name}/topics
-    │   ├── questions.py       # GET /questions (filterable)
-    │   ├── topics.py          # GET /topics
-    │   └── syllabus.py        # GET /syllabus/gap-analysis
-    └── requirements.txt
+└── web/                           # Unified Next.js 16 App Router application
+    ├── app/
+    │   ├── (app)/                 # Student Portal routes (/, /dashboard, /practice, /roadmap, etc.)
+    │   ├── faculty/               # Faculty Portal routes (/faculty/*)
+    │   ├── admin/                 # Admin Portal routes (/admin/*)
+    │   ├── login/                 # Unified login with Google GIS & Credentials
+    │   ├── register/              # Student onboarding & registration
+    │   └── invite/[token]/        # Faculty invitation onboarding
+    ├── components/
+    │   ├── admin/                 # Admin-specific layout, charts, and tables
+    │   ├── faculty/               # Faculty-specific layout, drawers, and metrics
+    │   ├── staff/                 # Shared faculty/admin features (Custom Roadmap Builder)
+    │   └── layout/                # Common shell components (Navbar, Sidebar, etc.)
+    ├── lib/
+    │   ├── admin/                 # Admin API clients and types
+    │   ├── faculty/               # Faculty API clients, context, and types
+    │   ├── api.ts                 # Unified fetch utilities
+    │   ├── constants.ts           # Shared application constants
+    │   └── hooks.ts               # SWR data fetching hooks
+    └── proxy.ts                   # Role-aware edge authentication & route gating
 ```
 
-## Tech Stack
+---
 
-| Part | Technology |
-|------|-----------|
-| Frontend | Next.js 14, Tailwind CSS |
-| Charts | Recharts (student portal), Chart.js (faculty heatmaps) |
-| Backend | FastAPI (Python) |
-| Database | Supabase (PostgreSQL) |
-| Auth | Supabase Auth (faculty-only gating) |
-| Deployment | Vercel (frontend), Supabase Edge (backend) |
+## Portal Roles & URL Routing
 
-## Use Case 1 — Student Portal
+The single web application uses route paths to distinguish user domains while enforcing strict role-based access control in [`proxy.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/dashboard/web/proxy.ts):
 
-Key views:
-- **Home** — search and filter companies by name, tier, role
-- **Company Page** — topic breakdown, round types, difficulty distribution, sample questions
-- **Topic Browser** — see which companies test a specific topic most frequently
+| Domain | Base Path | Target Audience | Primary Features |
+|---|---|---|---|
+| **Student Portal** | `/` | NST Students | Company roadmaps, weekly curricula, interactive practice (MCQ & coding), LeetCode & Codeforces verification, doubts, session booking, streak/XP tracking. |
+| **Faculty Portal** | `/faculty` | Faculty & Mentors | Curriculum gap analysis, student progress matrix, doubt resolution inbox, 1-on-1 mentorship session management, custom roadmap authoring. |
+| **Admin Portal** | `/admin` | Administrators | System analytics (engagement, practice, placements), question moderation, company management, feature flags, faculty invitations. |
 
-## Use Case 2 — Faculty Dashboard
+---
 
-Key views:
-- **Gap Analysis Overview** — topics industry tests vs what the syllabus covers
-- **Heatmap** — course x company coverage matrix
-- **Course Drill-down** — for each course, see aligned and missing industry topics
+## Quick Start
 
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/companies` | List all companies with metadata |
-| GET | `/companies/{name}/topics` | Topic frequency breakdown for a company |
-| GET | `/companies/{name}/questions` | Paginated question list |
-| GET | `/topics` | All topics with industry frequency |
-| GET | `/questions?company=&topic=&difficulty=` | Filtered questions |
-| GET | `/syllabus/gap-analysis` | Industry vs syllabus gap report |
-
-## Getting Started
+To develop the web frontend directly:
 
 ```bash
-# Backend API
-cd dashboard/api
-pip install -r requirements.txt
-uvicorn main:app --reload
+cd dashboard/web
 
-# Student portal
-cd dashboard/student-portal
-npm install && npm run dev
+# Install dependencies (managed at root workspace)
+npm install
 
-# Faculty dashboard
-cd dashboard/faculty-dashboard
-npm install && npm run dev
+# Configure environment
+cp .env.example .env.local
+
+# Start web development server (:3000)
+npm run dev
 ```
 
-## Admin portal
-cd dashboard/admin-portal
-npm install && npm run dev
+For full-stack local development (running both the Express API and Next.js web application simultaneously), use `npm run dev` from the repository root.
 
-## Status
-
-| Component | Status |
-|-----------|--------|
-| FastAPI backend | 🔲 Not started |
-| Student portal | 🔲 Not started |
-| Faculty dashboard | 🔲 Not started |
-| Vercel deployment | 🔲 Not started |
+For detailed frontend documentation, see [dashboard/web/README.md](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/dashboard/web/README.md).

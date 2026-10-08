@@ -1,118 +1,64 @@
-# Schema
+# Schema & Data Models
 
-Database schema definitions, migration files, and the Entity Relationship Diagram for the normalized interview data model.
+This directory documents the data schemas, entity models, and topic taxonomies used throughout PlacePrep.
 
-## Structure
+---
 
-```
-schema/
-├── migrations/
-│   ├── 001_create_companies.sql
-│   ├── 002_create_roles.sql
-│   ├── 003_create_topics.sql
-│   ├── 004_create_questions.sql
-│   ├── 005_create_question_topics.sql
-│   ├── 006_create_courses.sql
-│   └── 007_create_syllabus_topics.sql
-├── seed/
-│   ├── companies.sql        # Seed known company names
-│   └── topics.sql           # Seed standard topic taxonomy
-└── erd.md                   # Entity Relationship Diagram
-```
+## Active Production Database: MongoDB Atlas (Mongoose)
 
-## Core Tables
+PlacePrep's primary production database runs on **MongoDB Atlas** managed via **Mongoose** models located in [`backend/src/models/`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models).
 
-```sql
--- Companies
-CREATE TABLE companies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  country TEXT DEFAULT 'India',
-  tier TEXT  -- FAANG, Product, Service, Startup
-);
+### Core Models
 
--- Roles
-CREATE TABLE roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,  -- SDE-1, SDE-2, Data Analyst, etc.
-  level TEXT           -- Junior, Mid, Senior
-);
-
--- Topics / Skill Areas
-CREATE TABLE topics (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,   -- Dynamic Programming, OS, DBMS, ML
-  category TEXT                -- DSA, Core CS, Domain
-);
-
--- Questions (core table)
-CREATE TABLE questions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id UUID REFERENCES companies(id),
-  role_id UUID REFERENCES roles(id),
-  round_type TEXT,             -- coding, system_design, hr, managerial
-  problem_summary TEXT,
-  difficulty TEXT,             -- Easy, Medium, Hard
-  source TEXT,                 -- geeksforgeeks, leetcode, etc.
-  source_url TEXT,
-  scraped_at TIMESTAMPTZ,
-  frequency_score FLOAT DEFAULT 0.0
-);
-
--- Many-to-many: questions <-> topics
-CREATE TABLE question_topics (
-  question_id UUID REFERENCES questions(id),
-  topic_id UUID REFERENCES topics(id),
-  PRIMARY KEY (question_id, topic_id)
-);
-
--- B.Tech CS & AI Courses (for Use Case 2)
-CREATE TABLE courses (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,          -- Data Structures & Algorithms, OS, DBMS
-  semester INT
-);
-
--- Syllabus topics linked to courses and the topic taxonomy
-CREATE TABLE syllabus_topics (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id UUID REFERENCES courses(id),
-  topic_id UUID REFERENCES topics(id),
-  coverage_depth TEXT          -- Introductory, Intermediate, Advanced
-);
+```mermaid
+erDiagram
+    User ||--o| StudentProfile : "has"
+    User ||--o| FacultyProfile : "has"
+    User ||--o{ UserRoadmap : "progresses"
+    User ||--o{ QuestionCompletion : "solves"
+    User ||--o{ CustomRoadmapFollow : "subscribes"
+    CustomRoadmap ||--o{ CustomRoadmapFollow : "followed by"
+    Company ||--o{ Question : "features"
+    Question ||--o{ QuestionCompletion : "completed in"
+    User ||--o{ DoubtThread : "raises"
+    User ||--o{ SessionBooking : "books"
 ```
 
-## Entity Relationship Diagram
+| Model | File | Description |
+|---|---|---|
+| `User` | [`User.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/User.ts) | Core user authentication record (email, password hash, role: `student` \| `faculty` \| `admin`, googleId, avatar picture, status). |
+| `StudentProfile` | [`StudentProfile.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/StudentProfile.ts) | Student metadata: batch, branch, self-ratings, daily goal, total XP, streak, and external platform handles (`leetcode`, `codeforces`). |
+| `FacultyProfile` | [`FacultyProfile.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/FacultyProfile.ts) | Faculty metadata: department, designation, office hours, areas of expertise. |
+| `Question` | [`Question.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/Question.ts) | Question pool (22,750+ questions). Includes companySlug, problem summary, difficulty (`Easy`/`Medium`/`Hard`), roundType, topics, LeetCode / external URLs, and MCQ choices. |
+| `Company` | [`Company.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/Company.ts) | 670+ company entities with hiring patterns, interview rounds, tier, logo URL, and hiring statistics. |
+| `UserRoadmap` | [`UserRoadmap.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/UserRoadmap.ts) | Personalized student curricula generated from self-assessment ratings (`frequency × weakness`) with weekly problem schedules. |
+| `CustomRoadmap` | [`CustomRoadmap.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/CustomRoadmap.ts) | Faculty-authored curricula spanning multiple companies, custom week organization, external questions, and publish/retire states. |
+| `CustomRoadmapFollow` | [`CustomRoadmapFollow.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/CustomRoadmapFollow.ts) | Tracks student subscriptions to custom roadmaps. |
+| `QuestionCompletion` | [`QuestionCompletion.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/QuestionCompletion.ts) | Records student problem solves, XP awarded, and live platform verification status (`verifiedViaPlatform: boolean`). |
+| `DoubtThread` | [`DoubtThread.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/DoubtThread.ts) | Threaded doubt resolution between students and faculty. |
+| `SessionBooking` | [`SessionBooking.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/SessionBooking.ts) | 1-on-1 mentorship and mock interview session scheduling. |
+| `CurriculumTopic` | [`CurriculumTopic.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/CurriculumTopic.ts) | Academic syllabus topics used for faculty curriculum gap intelligence. |
+| `FeatureFlag` | [`FeatureFlag.ts`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend/src/models/FeatureFlag.ts) | System-wide toggles managed by administrators. |
 
-```
-companies ──< questions >── roles
-                  │
-            question_topics
-                  │
-               topics
-                  │
-          syllabus_topics
-                  │
-               courses
-```
-
-## Running Migrations
-
-```bash
-# Using Supabase CLI
-supabase db push
-
-# Or directly via psql
-psql $DATABASE_URL -f schema/migrations/001_create_companies.sql
-```
+---
 
 ## Topic Taxonomy
 
-Standard categories used across the project:
+Questions and curriculum mappings follow a standardized topic taxonomy across four domains:
 
 | Category | Topics |
-|----------|--------|
-| DSA | Arrays, Strings, LinkedList, Trees, Graphs, DP, Greedy, Backtracking, Sorting, Hashing |
-| Core CS | OS, DBMS, Networks, OOP, System Design, Compiler Design |
-| Domain | Machine Learning, SQL, Web Dev, Cloud, DevOps |
-| Behavioral | Communication, Leadership, Problem Solving |
+|---|---|
+| **Data Structures & Algorithms** | Arrays, Strings, Two Pointers, Sliding Window, Linked Lists, Stacks & Queues, Trees, Binary Search Trees, Graphs, Dynamic Programming, Greedy, Backtracking, Bit Manipulation, Math |
+| **Core Computer Science** | Operating Systems, Database Management Systems (DBMS), Computer Networks, Object-Oriented Programming (OOP), System Design (HLD/LLD) |
+| **Domain Technologies** | Machine Learning, Deep Learning, SQL, Web Technologies, Cloud Computing, DevOps |
+| **Behavioral & HR** | Leadership Principles, STAR Method Questions, Problem Solving, Project Walkthroughs |
+
+---
+
+## Relational Reference Model (SQL Archive)
+
+During early prototyping, a relational PostgreSQL schema was drafted:
+- [`migrations/`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/schema/migrations): Contains historical SQL migration definitions (`001_create_companies.sql` through `007_create_syllabus_topics.sql`).
+- [`seed/`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/schema/seed): Seed data templates.
+
+For all active development, use the Mongoose schemas defined in `backend/src/models/`.

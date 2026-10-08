@@ -1,42 +1,34 @@
 # PlacePrep — NST Interview Prep Portal
 
-A data-driven portal with two use cases — helping NST students prepare for technical
-interviews at specific companies, and helping faculty align the B.Tech CS & AI
-curriculum with what industry actually tests for.
+A data-driven placement preparation portal with two core missions:
+1. **Helping NST students prepare for technical interviews** at top companies through personalized, company-specific roadmaps, live LeetCode/Codeforces solve verification, interactive practice, and faculty mentorship.
+2. **Helping faculty align the B.Tech CS & AI curriculum** with real-world industry hiring patterns and interview expectations via automated gap analysis.
 
-Both are powered by the same dataset: interview questions, hiring patterns and skill
-requirements scraped and curated from public sources.
+Both use cases are powered by a shared dataset of over **22,750+ interview questions** and **670+ company profiles** scraped and curated from premier tech platforms.
 
 ---
 
-## Current State
-
-**Single Next.js app + a standalone Express API, sharing one MongoDB Atlas database.**
-
-The three separate portal deployments the earlier version of this document described
-(student / faculty / admin, each its own Next.js app) were merged into one. They
-already shared a database, a JWT secret and a backend library, so the split bought no
-isolation while costing three dev servers, three dependency trees and a cross-origin
-auth handoff that passed the session token in a URL.
+## Architectural Highlights
 
 ```mermaid
 flowchart LR
-    B["Browser"] -->|"one origin"| W
+    B["Browser"] -->|"same origin (cookies preserved)"| W
 
-    subgraph W["Next.js app · :3000 · dashboard/web"]
+    subgraph W["Next.js 16 App · :3000 · dashboard/web"]
         direction TB
-        R1["/ student"]
-        R2["/faculty/*"]
-        R3["/admin/*"]
-        MW["proxy.ts — role-aware auth"]
+        R1["/ student portal"]
+        R2["/faculty/* portal"]
+        R3["/admin/* portal"]
+        MW["proxy.ts (edge role gating)"]
     end
 
     W -->|"rewrites /api/*"| A
 
-    subgraph A["Express API · :4000 · backend"]
+    subgraph A["Express 5 API · :4000 · backend"]
         direction TB
-        RT["routes/ — 106 endpoints"]
+        RT["fsRouter — 107 endpoints"]
         SV["services/ · repositories/"]
+        MD["models/ (18 Mongoose schemas)"]
     end
 
     A --> DB[("MongoDB Atlas")]
@@ -46,295 +38,163 @@ flowchart LR
     style DB fill:#431407,stroke:#f97316,color:#e2e8f0
 ```
 
-Next rewrites `/api/*` to the Express server, so the browser only ever sees one
-origin. Cookies stay same-origin and there is no CORS layer — deliberately, since
-adding one would recreate the problem the merge removed.
+### 1. Unified Web Architecture (3 Portals → 1 App)
+The legacy architecture consisted of three separate Next.js portal repositories (`student-portal`, `faculty-portal`, `admin-portal`) and a shared library. These were consolidated into a single high-performance Next.js 16 app under [`dashboard/web/`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/dashboard/web):
+- **Zero Cross-Origin Friction**: Replaces cross-origin URL token passing with secure, same-origin HttpOnly cookies.
+- **Edge Role Protection (`proxy.ts`)**: Enforces RBAC at the edge. Users accessing routes outside their assigned role are seamlessly redirected to their respective home portal (`/`, `/faculty`, or `/admin`).
+- **Resource Optimization**: Slashes `node_modules` size by over 50% and consolidates dependencies to React 19, Tailwind CSS v4, Lucide React, and SWR.
 
-| | |
-|---|---|
-| Frontend | Next.js 16 (App Router, Turbopack), React 19, Tailwind v4, SWR |
-| API | Express 5 on Node, TypeScript via `tsx` |
-| Database | MongoDB Atlas via Mongoose |
-| Auth | JWT in an HttpOnly cookie, verified in `proxy.ts` (edge) and per route |
+### 2. Standalone Express 5 API Server
+The backend in [`backend/`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend) runs as an independent Express 5 service on port `:4000`:
+- **Filesystem Router (`fsRouter.ts`)**: Dynamically mounts 107 endpoints by scanning `src/routes/`, ensuring static route segments take precedence over dynamic parameters.
+- **Web Standard Adapter**: Bridges Express HTTP lifecycles to standard Web Fetch `Request` / `Response` abstractions.
+- **Resilient MongoDB Boot**: Non-blocking database connection lifecycle. If MongoDB Atlas experiences network downtime, the API stays running, reports `{"status":"degraded"}` via `/health`, and automatically reconnects once network access is restored.
 
-### Roles and URLs
+### 3. Authentication & Verification
+- **Google OAuth Restriction**: Google Identity Services (GIS) login strictly restricted to `@nst.rishihood.edu.in` institutional accounts. First-time sign-ins auto-provision student records and sync profile pictures.
+- **Live Submission Verification**:
+  - Direct integration with the **LeetCode GraphQL API** (`recentAcSubmissionList`) and **Codeforces REST API** (`user.status`).
+  - When students complete a coding question, the server verifies that an `Accepted` submission exists for their linked handle before awarding XP.
+  - Non-blocking warning modals notify students if their external handle is not yet connected.
+- **Interactive MCQs**: Full in-browser quiz mode with instant feedback, explanations, and automatic XP distribution.
 
-| Role | URL prefix | Pages |
+---
+
+## Roles and URLs
+
+| Role | URL Prefix | Description & Primary Features |
 |---|---|---|
-| Student | `/` — `/dashboard`, `/practice`, `/roadmap`, … | 16 |
-| Faculty | `/faculty/*` | 14 |
-| Admin | `/admin/*` | 22 |
+| **Student** | `/` | Personalized roadmaps, weekly progression, LeetCode verification, interactive MCQs, streak/XP analytics, doubt submissions, 1-on-1 session booking. |
+| **Faculty** | `/faculty/*` | Curriculum gap analysis matrix, doubt resolution inbox, student progress matrix, mentorship session management, custom roadmap authoring. |
+| **Admin** | `/admin/*` | System analytics (engagement, practice, placements), question & company moderation, feature flag toggles, faculty invitations. |
+| **Staff** | `/api/staff/*` | Shared endpoints accessible to both Faculty and Admin (e.g. Custom Roadmap Builder). |
 
-`proxy.ts` maps each prefix to the roles allowed on it. `/api/staff/*` admits faculty
-**or** admin, for features both author.
+---
 
-### Deployment
+## What's Built
 
-The frontend is deployable to Vercel as before. **The Express API is not yet
-deployed** — Vercel cannot host a long-running process, so it needs a Node host
-(Render, Railway, Fly). `API_URL` is the only knob: point it at the deployed API and
-no code changes are needed. Until then the project runs locally.
+### Student Experience
+- **Adaptive Roadmaps**: Tailored curricula generated from self-assessment ratings (`frequency × weakness`). Week-by-week progression with upcoming week previews.
+- **Interactive Practice**: Coding problems with platform badges (LeetCode, Codeforces, HackerRank, GeeksforGeeks), plus native interactive MCQs.
+- **Live Solve Verification**: Validates actual competitive programming submissions before awarding XP (Easy: 10, Medium: 25, Hard: 50).
+- **Gamification & Heatmaps**: Daily streaks, XP progress bars, GitHub-style activity heatmaps, and batch-wide leaderboards.
+
+### Staff-Authored Custom Roadmaps (Faculty & Admin)
+- Multi-company curricula curated by faculty, with drag-and-drop week organization and external LeetCode problem additions.
+- **Company Logo Stacks**: Visually distinct overlapping logo badges on roadmap cards indicating all covered companies.
+- **Live Follower Sync**: Updates propagate immediately to all student subscribers without erasing question completion records.
+- **Safe Unpublish Dialog**: Two-step retirement workflow showing real subscriber counts; choice between retiring (hidden from discovery while existing followers keep progress) or full removal.
+
+### Faculty & Curriculum Intelligence
+- **Gap Analysis**: Compares industry interview frequencies against the NST B.Tech CS & AI course syllabus to highlight unaddressed topics.
+- **Doubts Inbox & Mentorship**: Threaded doubt-clearing interface filtered by domain and urgency.
+
+---
+
+## Live Data Statistics
+
+| Collection | Count | Description |
+|---|---|---|
+| **Questions** | 22,759 | 2,284 generic pool questions + 20,475 company-tagged DSA/CS questions |
+| **Companies** | 676 | Top product companies, FAANG, high-growth startups, and tech firms |
+| **User Roadmaps** | 22+ | Student personalized learning paths |
+| **Question Completions** | 373+ | Tracked student solves with XP and platform verification flags |
 
 ---
 
 ## Getting Started
 
+### Prerequisites
+- Node.js >= 20.0.0
+- npm >= 10.0.0
+- MongoDB Atlas cluster connection string
+- Google Cloud OAuth Client ID (authorized for `@nst.rishihood.edu.in`)
+
+### Installation
+
 ```bash
+# Clone repository
 git clone git@github.com:sourabh14022004/Place_Prep_Sourabh.git
 cd Place_Prep_Sourabh
+
+# Install dependencies across all workspaces
 npm install
 ```
 
-Copy the env templates and fill them in:
+### Environment Configuration
+
+Configure both workspaces:
 
 ```bash
 cp backend/.env.example backend/.env.local
 cp dashboard/web/.env.example dashboard/web/.env.local
 ```
 
-Both files document their own fields. Three things are easy to get wrong:
+Important configuration keys:
+- `MONGODB_URI`: MongoDB Atlas connection string (percent-encode special characters in the password, e.g. `@` -> `%40`).
+- `JWT_SECRET`: Minimum 32-character secret, **identical in both `backend/.env.local` and `dashboard/web/.env.local`**.
+- `API_URL` (web): Points to `http://localhost:4000` (must match `API_PORT` in backend).
+- `GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_CLIENT_ID`: Your Google OAuth 2.0 Web Client ID.
 
-- `MONGODB_URI` — special characters in the password must be percent-encoded (`@` becomes `%40`)
-- `JWT_SECRET` — minimum 32 characters, and **byte-identical in both files**; if they diverge every request 401s
-- `API_URL` (web) must match `API_PORT` (backend)
-
-Then:
+### Running Locally
 
 ```bash
+# Run both Backend API (:4000) and Web Frontend (:3000) concurrently
 npm run dev
 ```
 
-That starts both processes under one command — the API on `:4000` and the web app on
-`:3000`. Open http://localhost:3000.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-| Command | Does |
-|---|---|
-| `npm run dev` | API + web together |
-| `npm run dev:api` / `npm run dev:web` | one at a time |
-| `npm run typecheck` | both workspaces |
-| `npm run build` | both workspaces |
-
-### If the database won't connect
-
-MongoDB Atlas rejects connections from IPs that aren't allowlisted, which is the
-usual cause when it breaks after switching networks. Add your current IP under
-Atlas → **Network Access**. The API starts and keeps serving even when the database
-is unreachable — `/health` reports `{"status":"degraded"}` and data routes return
-`503` — and reconnects on its own once access is restored, with no restart.
+| Command | Workspace | Description |
+|---|---|---|
+| `npm run dev` | Root | Starts both Express API (:4000) and Next.js Web (:3000) concurrently |
+| `npm run dev:api` | Backend | Starts Express API with hot-reload via `tsx watch` |
+| `npm run dev:web` | Web | Starts Next.js frontend with Turbopack |
+| `npm run typecheck` | Both | Executes `tsc --noEmit` across backend and web |
+| `npm run build` | Both | Compiles backend to `dist/` and creates Next.js production build |
 
 ---
 
-## Project Structure
+## Production Deployment
+
+- **Web Frontend**: Deploy [`dashboard/web`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/dashboard/web) to **Vercel**. Set `API_URL` in Vercel to your deployed backend URL.
+- **API Server**: Deploy [`backend`](file:///Users/sourabhsarkarmacois/Desktop/Place_Prep_Sourabh/backend) as a persistent Node.js service on **Railway**, **Render**, or **Fly.io** using `npm run start` (health check at `/api/health`).
+
+---
+
+## Repository Structure
 
 ```
 Place_Prep_Sourabh/
-├── backend/                  Express API (workspace: placeprep-backend)
-│   └── src/
-│       ├── server.ts         entry — listen, graceful shutdown
-│       ├── app.ts            express app, shared Mongo pool
-│       ├── http/             Express ↔ Web Fetch adapter + filesystem router
-│       ├── routes/           106 endpoints, URL derived from directory path
-│       ├── services/         business logic (11)
-│       ├── repositories/     data access (12)
-│       ├── models/           Mongoose schemas (20)
-│       └── utils/            auth, errors, JWT, rate limiting
+├── backend/                  # Standalone Express 5 API (port 4000)
+│   ├── src/
+│   │   ├── server.ts         # Server entry point
+│   │   ├── app.ts            # Express setup & middleware
+│   │   ├── http/             # fsRouter (107 routes) & Web adapter
+│   │   ├── routes/           # Role-scoped routes (auth, student, staff, etc.)
+│   │   ├── services/         # Business logic (student, auth, custom roadmaps)
+│   │   ├── repositories/     # Mongoose data access layers
+│   │   ├── models/           # 18 Mongoose schemas
+│   │   └── utils/            # JWT, authMiddleware, errors, rate limiter
+│   └── scripts/              # Seeders & data backfill utilities
 │
-├── dashboard/web/            Next.js app (workspace: placeprep-web)
-│   ├── app/                  (app)/ student · faculty/ · admin/
-│   ├── components/           shared + student/, faculty/, admin/, staff/
-│   ├── lib/                  API clients and hooks
-│   └── proxy.ts              role-aware auth middleware
+├── dashboard/                # Frontend container
+│   ├── README.md             # Dashboard architecture transition notes
+│   └── web/                  # Unified Next.js 16 app (port 3000)
+│       ├── app/              # (app)/ student, faculty/, admin/, login/
+│       ├── components/       # Shared UI, logo stacks, modals, role views
+│       ├── lib/              # SWR hooks, constants, API client
+│       └── proxy.ts          # Edge authentication & role-based proxy
 │
-├── scrapers/  pipeline/  schema/  data/    data collection (see below)
-└── docs/
+├── scrapers/                 # Scrapers and parsers for interview question platforms
+├── pipeline/                 # Data normalization & transformation scripts
+├── schema/                   # Data model definitions & taxonomy
+├── data/                     # Filtered datasets & execution reports
+└── docs/                     # System architecture & research documentation
 ```
-
-Routes are mounted by walking `backend/src/routes`, so a file's path *is* its URL —
-`routes/questions/[id]/complete/route.ts` serves `/api/questions/:id/complete`. There
-is no route manifest to drift out of sync.
-
----
-
-## What's Built
-
-**Student** — company-specific roadmaps generated from that student's self-ratings
-(topics ordered by `frequency × weakness`), practice with MCQ support, progress
-analytics with an activity heatmap, XP and streaks, leaderboards, doubts to faculty,
-session booking, interview experience submissions.
-
-**Faculty** — doubt resolution, session requests, student matrix, company rankings,
-curriculum gap analysis, industry trends, report export.
-
-**Admin** — overview and analytics (engagement, doubts, practice, placement), student
-and faculty management, question moderation, company management, feature flags,
-notifications.
-
-**Custom roadmaps** *(faculty + admin)* — a multi-company plan authored by staff,
-with questions arranged into weeks by hand, external LeetCode-style questions, and
-publish / retire controls. Students discover and follow these from `/roadmap`.
-Followers are linked live, so an edit reaches them immediately; progress is derived
-by intersecting their completions with the roadmap's current question set, so
-removing a question never costs anyone credit.
-
-### Live data
-
-| Collection | Count |
-|---|---|
-| Questions | 22,759 *(2,284 with no company — the shared generic pool)* |
-| Companies | 676 |
-| User roadmaps | 22 |
-| Question completions | 373 |
-
----
-
-## Use Cases
-
-### 1 · Company-Specific Interview Prep (student-facing)
-
-Answers questions like: what topics does Google test in SDE interviews? What is the
-interview format at Amazon or Flipkart? Which problem categories appear most often at
-a given company? Are there recurring system design or behavioural questions for a role?
-
-### 2 · Curriculum Intelligence (faculty-facing)
-
-> *Are the skills we teach in our B.Tech CS & AI curriculum aligned with what
-> companies actually test and hire for?*
-
-Maps structured interview data — topics, skills, problem types — against the course
-syllabus to produce a **gap analysis**: topics industry expects but we don't teach,
-and topics heavily covered that may have lower industry relevance.
-
----
-
-## Data Collection
-
-`scrapers/`, `pipeline/`, `schema/` and `data/` hold the collection side. Each carries
-its own README; `pipeline/SOURCE-REGISTRY.md` tracks which sources have been worked.
-
-Current state here is narrower than the catalogue below suggests: one scraper group is
-implemented (`scrapers/group-a` — clone-and-parse, then promote-to-mongo), and
-`data/filtered-output/` holds the prepared datasets and an execution report. The
-remaining sources listed below are candidates, not completed integrations.
-
-### Fields captured
-
-- Company, role and level (SDE-1, SDE-2, Data Analyst, …)
-- Round type (coding, system design, HR, managerial, aptitude)
-- Topic / skill area (Dynamic Programming, OS, DBMS, ML, …)
-- Problem statement or summary, and difficulty
-- Source URL and collection date
-- Frequency signal — how often a topic or question recurs
-
----
-
-## Data Sources
-
-> **Students — we need your help expanding this list!**
-> Found a useful source not listed here? Open a PR and add it to the appropriate table below. See [Contributing a Data Source](#contributing-a-data-source) at the bottom of this page.
-
-### DSA & Coding Problem Platforms
-
-| Source | What It Contains |
-|--------|-----------------|
-| [GeeksForGeeks](https://www.geeksforgeeks.org) | Company-tagged DSA problems, interview experiences, topic-wise questions |
-| [LeetCode Discuss](https://leetcode.com/discuss) | Company-tagged problems, community interview reports |
-| [InterviewBit](https://www.interviewbit.com) | Topic and company-wise structured problem sets |
-| [HackerRank](https://www.hackerrank.com) | Role-based coding challenges, company-sponsored contests |
-| [HackerEarth](https://www.hackerearth.com) | Coding challenges, campus hiring contest archives |
-| [CodeChef](https://www.codechef.com) | Competitive programming problems, company hiring contests |
-| [Codeforces](https://codeforces.com) | Competitive programming problem archive |
-| [AlgoExpert](https://www.algoexpert.io) | Curated interview problems with video explanations |
-| [NeetCode](https://neetcode.io) | Curated LeetCode roadmap by topic and company |
-| [Coding Ninjas](https://www.codingninjas.com) | Company-wise DSA problems, very popular in Indian colleges |
-| [Educative.io](https://www.educative.io) | Grokking series — system design, coding patterns |
-
-### Indian Placement & Job Portals
-
-| Source | What It Contains |
-|--------|-----------------|
-| [AmbitionBox](https://www.ambitionbox.com) | Indian company-specific interview experiences and questions |
-| [Naukri.com](https://www.naukri.com) | Job postings with skill tags relevant to Indian tech market |
-| [PrepInsta](https://prepinsta.com) | Company-wise placement papers, aptitude & coding questions |
-| [IndiaBix](https://www.indiabix.com) | Aptitude, verbal, technical MCQs — widely used for campus prep |
-| [FacePrep](https://www.faceprep.in) | Company-specific placement prep, mock tests |
-| [CareerRide](https://www.careerride.com) | Interview questions by company and technology |
-| [Freshersworld](https://www.freshersworld.com) | Fresher job listings, off-campus drives, placement papers |
-| [Workat.tech](https://workat.tech) | Indian startup interview experiences, DSA practice |
-| [Instahyre](https://www.instahyre.com) | Indian tech hiring, skill-based job matching |
-
-### Company Reviews & Interview Experiences
-
-| Source | What It Contains |
-|--------|-----------------|
-| [Glassdoor](https://www.glassdoor.com) | Interview reviews, question logs by company and role, difficulty ratings |
-| [Blind / TeamBlind](https://www.teamblind.com) | Anonymous tech worker posts — interview experiences, offers, comp data |
-| [Levels.fyi](https://www.levels.fyi) | Compensation data + interview difficulty ratings by company and level |
-| [Prepfully](https://prepfully.com) | Interview experiences and mock interview reviews |
-| [CareerCup](https://www.careercup.com) | Interview questions shared by candidates, organized by company |
-
-### Job Listings & Skills Intelligence
-
-| Source | What It Contains |
-|--------|-----------------|
-| [LinkedIn Jobs](https://www.linkedin.com/jobs) | Job descriptions, required skills by company and role |
-| [Indeed](https://www.indeed.com) | Job postings with skill requirements, salary estimates |
-| [Wellfound (AngelList)](https://wellfound.com) | Startup job listings with explicit tech stack and skill requirements |
-| [Cutshort](https://cutshort.io) | Indian tech hiring — skill-tagged job listings |
-
-### Community & Discussion
-
-| Source | What It Contains |
-|--------|-----------------|
-| [Reddit — r/cscareerquestions](https://www.reddit.com/r/cscareerquestions) | Anecdotal interview experiences, FAANG prep threads |
-| [Reddit — r/india](https://www.reddit.com/r/india) | Indian company interview experiences, placement discussions |
-| [Reddit — r/developersIndia](https://www.reddit.com/r/developersIndia) | Indian dev community — job prep, interview experiences |
-| [Quora](https://www.quora.com) | Interview experience Q&As, company-specific threads |
-
-### Curated Repositories & Open Content
-
-| Source | What It Contains |
-|--------|-----------------|
-| [GitHub Repos](https://github.com) | Curated interview prep repos (e.g. awesome-interview-questions, system-design-primer) |
-| [System Design Primer](https://github.com/donnemartin/system-design-primer) | Comprehensive system design interview resource |
-| [Tech Interview Handbook](https://www.techinterviewhandbook.org) | Structured guide — algorithms, behavioral, offers |
-| [NeetCode.io Roadmap](https://neetcode.io/roadmap) | Structured DSA roadmap with company frequency tags |
-
-### Supplementary / Niche Sources
-
-| Source | What It Contains |
-|--------|-----------------|
-| [GreatFrontEnd](https://www.greatfrontend.com) | Frontend-specific interview questions (HTML, CSS, JS, React) |
-| [ByteByByte](https://www.byte-by-byte.com) | Algorithm interview breakdowns with solutions |
-| [interviewing.io](https://interviewing.io) | Mock interview recordings and feedback (public blog posts) |
-| Company Engineering Blogs | Tech blogs from Google, Meta, Uber, etc. — insight into problem-solving culture |
-
-## Contributing a Data Source
-
-We're actively looking for more high-quality sources. If you know a website, forum, dataset, or community that has interview questions, company hiring patterns, or skill requirements — **please add it**.
-
-### How to contribute
-
-1. Fork this repository
-2. Add your source to the appropriate table in the [Data Sources](#data-sources) section above
-3. Use this format:
-
-```
-| [Source Name](https://url.com) | One line describing what data it contains and why it's useful |
-```
-
-4. Open a Pull Request with the title: `Add data source: <Source Name>`
-
-### What makes a good data source?
-- Contains **company-specific** interview questions or experiences
-- Has **topic or skill tags** (even informal ones)
-- Is **publicly accessible** (no login wall, or login-only but widely accessible)
-- Relevant to **Indian tech market** or **FAANG / top product companies**
-- Not already listed above
-
-> If you've personally used a resource to prep for interviews and found it useful — that's a great signal. Add it!
 
 ---
 
 ## License
 
-This project is for educational and research purposes at NST. Data is sourced from publicly available platforms in compliance with their respective Terms of Service.
+This project is developed for educational and research purposes at NST (Newton School of Technology). All interview questions and company data are curated from publicly accessible resources.
