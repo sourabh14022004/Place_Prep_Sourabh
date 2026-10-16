@@ -32,13 +32,22 @@ export default function Navbar() {
       </button>
 
       {/* Logo */}
-      <Link href="/dashboard" className={`flex items-center gap-2 shrink-0 transition-all ${isSidebarCollapsed ? "lg:w-[64px] lg:justify-center" : "lg:w-[224px]"}`}>
-        <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs">NST</div>
-        {!isSidebarCollapsed && (
-          <span className="font-bold text-gray-900 text-sm hidden sm:inline-block tracking-tight">
-            Place<span className="text-blue-600">Prep</span>
-          </span>
-        )}
+      <Link
+        href="/dashboard"
+        className={`flex items-center gap-2 shrink-0 transition-all ${
+          isSidebarCollapsed ? "lg:w-[68px] lg:justify-center" : "lg:w-[224px]"
+        }`}
+      >
+        <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs shrink-0">
+          NST
+        </div>
+        <span
+          className={`font-bold text-gray-900 text-sm tracking-tight ${
+            isSidebarCollapsed ? "lg:hidden" : ""
+          }`}
+        >
+          Place<span className="text-blue-600">Prep</span>
+        </span>
       </Link>
 
       <div className="flex-1" />
