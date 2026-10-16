@@ -11,4 +11,10 @@
 # ...but the templates must be committed — they carry no secrets, only key names.
 !*.env.example
 !.env.example
+# Credentials and secrets
+ACCOUNTS_CREDENTIALS.md
+accounts_credentials.md
+*credentials*.md
+*CREDENTIALS*.md
+*credentials*.env
 atlas-credentials.env
