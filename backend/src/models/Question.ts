@@ -43,6 +43,8 @@ export interface IQuestion extends Document {
   companyId?: mongoose.Types.ObjectId; // ref: Company
   companySlug?: string; // denormalized for fast queries
   companyName?: string; // denormalized for display
+  companySlugs?: string[]; // all company slugs that have asked this question
+  companyNames?: string[]; // all company names that have asked this question
   roundType: RoundType;
   roundNumber?: number;
   problemSummary: string;
@@ -100,6 +102,8 @@ const QuestionSchema = new Schema<IQuestion>(
     },
     companySlug: { type: String, index: true },
     companyName: { type: String },
+    companySlugs: { type: [String], default: [], index: true },
+    companyNames: { type: [String], default: [] },
     roundType: {
       type: String,
       enum: ['Coding', 'System Design', 'HR', 'Aptitude', 'LLD', 'Domain', 'Managerial'],
@@ -185,6 +189,7 @@ const QuestionSchema = new Schema<IQuestion>(
 // Performance indexes
 QuestionSchema.index({ companyId: 1, roundType: 1, difficulty: 1 });
 QuestionSchema.index({ companySlug: 1, difficulty: 1 });
+QuestionSchema.index({ companySlugs: 1, difficulty: 1 });
 QuestionSchema.index({ topics: 1 });
 QuestionSchema.index({ problemSummary: 'text' }); // full-text search
 QuestionSchema.index({ frequencyScore: -1 }); // for sorting by frequency

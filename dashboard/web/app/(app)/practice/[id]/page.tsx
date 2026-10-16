@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, ExternalLink, Loader2, CheckCircle, Lightbulb,
   ChevronDown, ChevronUp, Zap, Tag, RotateCcw, AlertCircle,
-  ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, X, Link2, HelpCircle,
+  ShieldCheck, ShieldAlert, Sparkles, AlertTriangle, X, Link2, HelpCircle, Building,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuestion, useCompletedQuestions, completeQuestion, usePlatformProfiles } from "@/lib/hooks";
@@ -98,6 +98,11 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
   const difficulty  = question.difficulty ?? question.diff ?? "Medium";
   const roundType   = question.roundType as string | undefined;
   const topics      = (question.topics as string[] | undefined) ?? [];
+  const companies: string[] = (Array.isArray(question.companies) && question.companies.length > 0)
+    ? question.companies
+    : (Array.isArray(question.companySlugs) && question.companySlugs.length > 0)
+    ? question.companySlugs
+    : (question.companySlug ? [question.companySlug] : []);
   const hints       = (question.hints as string[] | undefined) ?? [];
   const keyPoints   = (question.keyPoints as string[] | undefined) ?? [];
   const followUps   = (question.followUpQuestions as string[] | undefined) ?? [];
@@ -329,6 +334,23 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
                   {t}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Companies that ask this question */}
+          {companies.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                Asked at {companies.length} {companies.length === 1 ? 'Company' : 'Companies'}
+              </span>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                {companies.map((co) => (
+                  <span key={co} className="flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-gray-50 text-gray-700 border border-gray-200 capitalize font-medium">
+                    <Building className="w-2.5 h-2.5 text-gray-400" />
+                    {co}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>

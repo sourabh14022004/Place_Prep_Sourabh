@@ -471,7 +471,9 @@ export const studentService = {
     if (!question) throw ApiError.notFound('Question');
 
     const oid = new mongoose.Types.ObjectId(userId);
-    const qid = new mongoose.Types.ObjectId(questionId);
+    const qid = (question._id instanceof mongoose.Types.ObjectId)
+      ? question._id
+      : new mongoose.Types.ObjectId(question._id ?? questionId);
 
     // If already completed, return idempotently — do NOT throw.
     // Previously this threw ApiError.conflict which caused the UI checkbox to roll back
@@ -638,8 +640,10 @@ export const studentService = {
   },
 
   async uncompleteQuestion(userId: string, questionId: string): Promise<void> {
+    const question = await questionRepository.findById(questionId);
+    const resolvedId = question?._id?.toString() || questionId;
     const oid = new mongoose.Types.ObjectId(userId);
-    const qid = new mongoose.Types.ObjectId(questionId);
+    const qid = new mongoose.Types.ObjectId(resolvedId);
 
     // Find the completion record
     const completion = await QuestionCompletion.findOne({ studentId: oid, questionId: qid });

@@ -233,6 +233,8 @@ const QuestionSchema = new mongoose.Schema({
   companyId: { type: mongoose.Schema.Types.ObjectId, required: true },
   companySlug: { type: String, required: true },
   companyName: { type: String, required: true },
+  companySlugs: { type: [String], default: [] },
+  companyNames: { type: [String], default: [] },
   roundType: { type: String, required: true },
   roundNumber: Number,
   problemSummary: { type: String, required: true },
@@ -246,6 +248,9 @@ const QuestionSchema = new mongoose.Schema({
   isHot: { type: Boolean, default: false },
   verified: { type: Boolean, default: true },
   isSeeded: { type: Boolean, default: true },
+  isCanonical: { type: Boolean, default: true },
+  isDuplicate: { type: Boolean, default: false },
+  canonicalId: mongoose.Schema.Types.ObjectId,
   createdAt: { type: Date, default: Date.now },
 }, { collection: 'questions', _id: false });
 
@@ -425,10 +430,67 @@ async function main() {
   console.log(`    Topics inferred for ${inferredTopicCount} questions`);
   console.log(`    Round type re-classified for ${inferredRoundCount} questions`);
 
+  // ── Step 4b: Deduplicate questions with matching title and link ───────────
+  console.log('🔄  Deduplicating questions (combining company tags)...');
+  const qGroups = new Map();
+  for (const q of enrichedQuestions) {
+    const link = (q.leetcodeUrl || q.sourceUrl || '').trim().toLowerCase().replace(/\/+$/, '');
+    const title = (q.problemSummary || '').trim().toLowerCase();
+    const key = `${q.roundType || 'Coding'}|||${title}|||${link}`;
+    if (!qGroups.has(key)) qGroups.set(key, []);
+    qGroups.get(key).push(q);
+  }
+
+  const finalQuestionsToInsert = [];
+  let dupCount = 0;
+
+  for (const [key, group] of qGroups.entries()) {
+    if (group.length > 1) {
+      dupCount += (group.length - 1);
+      // Sort canonical by frequencyScore DESC
+      group.sort((a, b) => (b.frequencyScore || 0) - (a.frequencyScore || 0));
+      const canonical = group[0];
+      const others = group.slice(1);
+
+      const allSlugs = [...new Set(group.map(q => q.companySlug).filter(Boolean))];
+      const allNamesMap = new Map();
+      group.forEach(q => {
+        if (q.companySlug && q.companyName) allNamesMap.set(q.companySlug, q.companyName);
+      });
+      const allNames = allSlugs.map(s => allNamesMap.get(s) || s);
+      const allTopics = [...new Set(group.flatMap(q => q.topics || []))];
+
+      canonical.companySlugs = allSlugs;
+      canonical.companyNames = allNames;
+      canonical.topics = allTopics;
+      canonical.isCanonical = true;
+      canonical.isDuplicate = false;
+      canonical.isHot = group.some(q => q.isHot);
+      finalQuestionsToInsert.push(canonical);
+
+      for (const o of others) {
+        o.companySlugs = allSlugs;
+        o.companyNames = allNames;
+        o.isDuplicate = true;
+        o.isCanonical = false;
+        o.canonicalId = canonical._id;
+        finalQuestionsToInsert.push(o);
+      }
+    } else {
+      const q = group[0];
+      q.companySlugs = q.companySlug ? [q.companySlug] : [];
+      q.companyNames = q.companyName ? [q.companyName] : [];
+      q.isCanonical = true;
+      q.isDuplicate = false;
+      finalQuestionsToInsert.push(q);
+    }
+  }
+  console.log(`    Deduplicated ${dupCount} duplicate questions across ${qGroups.size} unique problems`);
+
   // ── Step 5: Insert questions in batches of 1000 ───────────────────────────
-  console.log(`    Inserting ${enrichedQuestions.length} questions...`);
+  console.log(`    Inserting ${finalQuestionsToInsert.length} questions...`);
   let questionInserted = 0;
-  for (const batch of chunk(enrichedQuestions, 1000)) {
+  for (const batch of chunk(finalQuestionsToInsert, 1000)) {
     const res = await Question.insertMany(batch, { ordered: false }).catch(e => {
       console.warn(`    ⚠️  Some question inserts skipped: ${e.message?.slice(0, 80)}`);
       return { length: batch.length };

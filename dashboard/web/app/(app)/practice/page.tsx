@@ -197,10 +197,12 @@ function QuizModal({
         </div>
 
         {/* Meta chips */}
-        <div className="px-6 pt-3 flex items-center gap-2 flex-wrap">
+        <div className="px-6 pt-3 flex items-center gap-2 flex-wrap max-h-24 overflow-y-auto">
           {question.topic && <span className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">{question.topic}</span>}
-          {question.companies?.slice(0, 3).map(co => (
-            <span key={co} className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">{co}</span>
+          {question.companies?.map(co => (
+            <span key={co} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded px-1.5 py-0.5 capitalize">
+              {co}
+            </span>
           ))}
           {question.hot && (
             <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5">
@@ -603,7 +605,11 @@ function PracticeContent() {
     title:       q.title       ?? q.problemSummary ?? "",
     diff:        q.diff        ?? q.difficulty     ?? "",
     topic:       Array.isArray(q.topics) ? q.topics[0] : (q.topicTag ?? ""),
-    companies:   q.companySlug ? [q.companySlug] : [],
+    companies:   (Array.isArray(q.companies) && q.companies.length > 0)
+                   ? q.companies
+                   : (Array.isArray(q.companySlugs) && q.companySlugs.length > 0)
+                   ? q.companySlugs
+                   : (q.companySlug ? [q.companySlug] : []),
     hot:         q.hot         ?? q.isHot          ?? false,
     leetcodeUrl: q.leetcodeUrl ?? null,
   }));
@@ -833,11 +839,19 @@ function PracticeContent() {
                       <div className={`font-medium text-sm truncate ${solved ? "text-gray-400" : "text-gray-900"}`}>{q.title}</div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {q.topic && <span className="text-xs text-gray-500">{q.topic}</span>}
-                        {q.companies?.slice(0, 2).map((co: string) => (
+                        {q.companies?.slice(0, 3).map((co: string) => (
                           <span key={co} className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 capitalize">
                             {co}
                           </span>
                         ))}
+                        {(q.companies?.length ?? 0) > 3 && (
+                          <span
+                            className="text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 rounded px-1.5 py-0.5 cursor-help"
+                            title={`Also asked at: ${q.companies!.slice(3).join(', ')}`}
+                          >
+                            +{q.companies!.length - 3} more
+                          </span>
+                        )}
                         {q.hot && (
                           <span className="text-xs bg-red-50 text-red-600 rounded px-1.5 py-0.5">
                             <Flame className="w-3 h-3 mr-1 inline-block" /> Hot

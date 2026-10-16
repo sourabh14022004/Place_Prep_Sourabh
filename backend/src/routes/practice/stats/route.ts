@@ -20,6 +20,7 @@ export async function GET(request: Request): Promise<Response> {
     await featureFlagService.assertEnabled('student.practice');
     
     const counts = await Question.aggregate([
+      { $match: { isDuplicate: { $ne: true }, verified: true } },
       { $group: { _id: '$roundType', count: { $sum: 1 } } }
     ]);
 

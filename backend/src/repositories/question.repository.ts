@@ -29,13 +29,26 @@ export const questionRepository = {
     limit?: number;
   }): Promise<{ questions: IQuestion[]; total: number }> {
     const query: Record<string, unknown> = { isDuplicate: { $ne: true }, verified: true };
-    if (filter.companySlug) query.companySlug = filter.companySlug;
+    const andClauses: any[] = [];
+    if (filter.companySlug) {
+      andClauses.push({
+        $or: [
+          { companySlug: filter.companySlug },
+          { companySlugs: filter.companySlug },
+        ],
+      });
+    }
     if (filter.companyId) query.companyId = new mongoose.Types.ObjectId(filter.companyId);
     if (filter.difficulty) query.difficulty = filter.difficulty;
     if (filter.search?.trim()) {
       const escaped = filter.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = { $regex: escaped, $options: 'i' };
-      query.$or = [{ problemSummary: searchRegex }, { topics: searchRegex }];
+      andClauses.push({
+        $or: [{ problemSummary: searchRegex }, { topics: searchRegex }],
+      });
+    }
+    if (andClauses.length > 0) {
+      query.$and = andClauses;
     }
     if (filter.roundType) {
       if (filter.roundType.includes(',')) {
@@ -106,7 +119,12 @@ export const questionRepository = {
   },
 
   async findById(id: string): Promise<IQuestion | null> {
-    return Question.findById(id).lean<IQuestion>();
+    const q = await Question.findById(id).lean<IQuestion>();
+    if (q && q.isDuplicate && q.canonicalId) {
+      const canonical = await Question.findById(q.canonicalId).lean<IQuestion>();
+      if (canonical) return canonical;
+    }
+    return q;
   },
 
   async findByIds(ids: string[]): Promise<IQuestion[]> {
@@ -114,7 +132,11 @@ export const questionRepository = {
   },
 
   async countByCompany(companySlug: string): Promise<number> {
-    return Question.countDocuments({ companySlug });
+    return Question.countDocuments({
+      isDuplicate: { $ne: true },
+      verified: true,
+      $or: [{ companySlug }, { companySlugs: companySlug }],
+    });
   },
 
   async search(query: string): Promise<IQuestion[]> {
