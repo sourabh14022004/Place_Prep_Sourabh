@@ -62,25 +62,31 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6">
+      <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 z-50 gap-2 lg:gap-0">
         {/* Mobile hamburger */}
         <button
-          className="lg:hidden p-2 -ml-2 rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+          className="lg:hidden p-1.5 -ml-1.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
           onClick={() => setMobileMenuOpen(true)}
+          aria-label="Toggle navigation"
         >
           <Menu className="h-5 w-5" />
         </button>
 
         {/* Logo container */}
-        <div className="hidden lg:flex items-center gap-3 w-[var(--sidebar-width)] shrink-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-blue-600 text-sm font-bold text-white shadow-md shadow-blue-500/30">
+        <Link
+          href="/faculty"
+          className="flex items-center gap-2.5 shrink-0 lg:w-[224px] group focus:outline-none"
+        >
+          <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs shadow-xs transition-transform duration-200 group-hover:scale-105">
             NST
           </div>
           <div>
-            <h1 className="text-sm font-bold leading-tight text-gray-900">PlacePrep</h1>
-            <p className="text-[10px] font-medium text-blue-600">Faculty Portal</p>
+            <span className="font-bold text-gray-900 text-sm tracking-tight block leading-tight">
+              Place<span className="text-blue-600">Prep</span>
+            </span>
+            <p className="text-[10px] font-medium text-blue-600/90 leading-none">Faculty Portal</p>
           </div>
-        </div>
+        </Link>
 
         {/* Page title */}
         <h1 className="text-base font-bold text-gray-900 lg:text-lg flex-1 lg:pl-4">
@@ -116,20 +122,34 @@ export default function Navbar() {
         <div className="fixed inset-0 z-50 lg:hidden">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
             onClick={() => setMobileMenuOpen(false)}
           />
           {/* Drawer */}
-          <div className="fixed inset-y-0 left-0 w-[var(--sidebar-width)] bg-white shadow-xl z-50 animate-in slide-in-from-left duration-200">
-            <div className="absolute top-3 right-3">
+          <div className="fixed inset-y-0 left-0 w-[260px] bg-white shadow-2xl z-50 flex flex-col animate-in slide-in-from-left duration-200">
+            <div className="flex h-14 items-center justify-between px-4 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs shadow-xs">
+                  NST
+                </div>
+                <div>
+                  <span className="font-bold text-gray-900 text-sm tracking-tight block leading-tight">
+                    Place<span className="text-blue-600">Prep</span>
+                  </span>
+                  <p className="text-[10px] font-medium text-blue-600/90 leading-none">Faculty Portal</p>
+                </div>
+              </div>
               <button
                 className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <SidebarContent />
+            <div className="flex-1 overflow-y-auto">
+              <SidebarContent onNavigate={() => setMobileMenuOpen(false)} />
+            </div>
           </div>
         </div>
       )}

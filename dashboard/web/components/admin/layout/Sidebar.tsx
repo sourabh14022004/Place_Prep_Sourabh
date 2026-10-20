@@ -1,3 +1,4 @@
+ar
 "use client";
 
 import Link from "next/link";
@@ -64,64 +65,58 @@ const navGroups = [
   },
 ];
 
-export function SidebarContent() {
+export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {
+      console.error("Logout failed", e);
+    } finally {
+      window.location.href = "/login";
+    }
+  };
+
   const isActive = (href: string) =>
-    href === "/overview"
+    href === "/admin/overview"
       ? pathname === href
       : pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <div className="flex h-full w-full flex-col bg-white overflow-y-auto">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-100 shrink-0">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-xs font-bold text-white">
-          NST
-        </div>
-        <div>
-          <h1 className="text-sm font-bold leading-tight text-gray-900">PlacePrep</h1>
-          <p className="text-[10px] font-medium text-gray-400">Admin Portal</p>
-        </div>
-      </div>
-
-      {/* Admin Info */}
-      <div className="mx-3 mt-3 mb-2 flex items-center gap-2.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 shrink-0">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-          AD
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-gray-900">Admin User</p>
-          <p className="truncate text-[10px] text-gray-400">Super Admin</p>
-        </div>
-      </div>
-
+    <div className="flex h-full w-full flex-col bg-white">
       {/* Grouped Navigation */}
-      <nav className="flex-1 px-3 pb-2">
-        {navGroups.map((group) => (
-          <div key={group.label} className="mb-2">
-            <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-400">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        {navGroups.map((group, groupIdx) => (
+          <div
+            key={group.label}
+            className={groupIdx > 0 ? "pt-3 mt-2 border-t border-gray-100" : ""}
+          >
+            <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
               {group.label}
             </p>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {group.items.map((item) => {
                 const active = isActive(item.href);
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`group flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                    onClick={onNavigate}
+                    className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       active
-                        ? "bg-blue-50 text-blue-600"
+                        ? "bg-blue-50 text-blue-700 font-semibold ring-1 ring-blue-100/80 shadow-2xs"
                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                     }`}
                   >
-                    <item.icon
-                      className={`h-4 w-4 flex-shrink-0 ${
-                        active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-500"
-                      }`}
-                    />
-                    {item.name}
+                    <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                      <item.icon
+                        className={`w-4 h-4 transition-colors ${
+                          active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"
+                        }`}
+                      />
+                    </div>
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 );
               })}
@@ -130,30 +125,34 @@ export function SidebarContent() {
         ))}
       </nav>
 
-      {/* Bottom */}
-      <div className="border-t border-gray-100 p-3 shrink-0">
+      {/* Bottom section */}
+      <div className="border-t border-gray-100 p-3 shrink-0 space-y-1">
         <Link
           href="/admin/help"
-          className={`group flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-            pathname === "/help"
-              ? "bg-blue-50 text-blue-600"
+          onClick={onNavigate}
+          className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+            pathname === "/admin/help"
+              ? "bg-blue-50 text-blue-700 font-semibold ring-1 ring-blue-100/80 shadow-2xs"
               : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
           }`}
         >
-          <HelpCircle className="h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-gray-500" />
-          Help
+          <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+            <HelpCircle className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+          </div>
+          <span className="truncate">Help</span>
         </Link>
         <button
-          onClick={async () => {
-            await fetch("/api/auth/logout", { method: "POST" });
-            window.location.href = "/login";
-          }}
-          className="w-full group flex items-center gap-2.5 rounded-md px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors cursor-pointer"
+          onClick={handleLogout}
+          className="w-full group flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
         >
-          <LogOut className="h-4 w-4 flex-shrink-0 text-gray-400 group-hover:text-gray-500" />
+          <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+            <LogOut className="w-4 h-4 text-red-600" />
+          </div>
           Logout
         </button>
-        <p className="px-3 pt-2 text-[10px] text-gray-300">NST Interview Intelligence</p>
+        <p className="px-3 pt-1 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+          NST Interview Intelligence
+        </p>
       </div>
     </div>
   );
@@ -161,8 +160,8 @@ export function SidebarContent() {
 
 export default function Sidebar() {
   return (
-    <div className="hidden border-r border-gray-100 lg:fixed lg:inset-y-0 lg:flex lg:w-[var(--sidebar-width)] lg:flex-col z-50">
+    <aside className="hidden border-r border-gray-200 lg:fixed lg:top-14 lg:bottom-0 lg:flex lg:w-[224px] lg:flex-col z-40 bg-white">
       <SidebarContent />
-    </div>
+    </aside>
   );
 }
