@@ -210,6 +210,10 @@ export function CompanyLogo({
   const domain = resolveCompanyDomain(name);
   const iconSize = 128;
 
+  const rounded = size < 20 ? "rounded-xs" : size < 28 ? "rounded-md" : "rounded-xl";
+  const pad = size <= 18 ? "p-0" : size < 28 ? "p-0.5" : "p-1.5";
+  const border = size <= 18 ? "border border-gray-200/50" : "border border-gray-200/80";
+
   if (!failed && domain) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -220,7 +224,7 @@ export function CompanyLogo({
         height={size}
         loading="lazy"
         onError={() => setFailed(true)}
-        className={`shrink-0 rounded-xl object-contain bg-white border border-gray-200/80 shadow-sm p-1.5 ${className}`}
+        className={`shrink-0 ${rounded} object-contain bg-white ${border} shadow-2xs ${pad} ${className}`}
         style={{ width: size, height: size }}
       />
     );
@@ -229,11 +233,11 @@ export function CompanyLogo({
   return (
     <div
       aria-hidden
-      className={`relative shrink-0 overflow-hidden rounded-xl flex items-center justify-center font-black text-white select-none ${className}`}
+      className={`relative shrink-0 overflow-hidden ${rounded} flex items-center justify-center font-black text-white select-none ${className}`}
       style={{
         width: size,
         height: size,
-        fontSize: size * 0.42,
+        fontSize: Math.max(9, Math.round(size * 0.44)),
         background: `linear-gradient(135deg, hsl(${hue} 72% 52%), hsl(${(hue + 40) % 360} 70% 44%))`,
       }}
     >
@@ -304,18 +308,21 @@ export function PlatformLogo({
   className?: string;
 }) {
   const p = (platform || "").toLowerCase().trim();
+  const rounded = size < 20 ? "rounded-xs" : size < 28 ? "rounded-md" : "rounded-xl";
+  const padSm = size <= 18 ? "p-0" : size < 28 ? "p-0.5" : "p-1";
+  const padSvg = size <= 18 ? "p-0.5" : size < 28 ? "p-1" : "p-1.5";
 
   if (p === "leetcode") {
     return (
       <div
-        className={`shrink-0 flex items-center justify-center rounded-xl bg-[#FFF8F0] border border-[#FFE8D6] p-0.5 shadow-sm overflow-hidden ${className}`}
+        className={`shrink-0 flex items-center justify-center ${rounded} bg-[#FFF8F0] border border-[#FFE8D6] ${size <= 18 ? "p-0" : "p-0.5"} shadow-2xs overflow-hidden ${className}`}
         style={{ width: size, height: size }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/leetcode.png"
           alt="LeetCode logo"
-          className="w-full h-full object-contain scale-[1.4] transform"
+          className="w-full h-full object-contain scale-[1.3] transform"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).src = "https://image.pngaaa.com/118/4868118-middle.png";
           }}
@@ -327,7 +334,7 @@ export function PlatformLogo({
   if (p === "codeforces") {
     return (
       <div
-        className={`shrink-0 flex items-center justify-center rounded-xl bg-[#F0F6FF] border border-[#D6E6FE] p-1.5 shadow-sm ${className}`}
+        className={`shrink-0 flex items-center justify-center ${rounded} bg-[#F0F6FF] border border-[#D6E6FE] ${padSvg} shadow-2xs ${className}`}
         style={{ width: size, height: size }}
       >
         <svg viewBox="0 0 24 24" className="w-full h-full" fill="none">
@@ -342,13 +349,13 @@ export function PlatformLogo({
   if (p === "geeksforgeeks" || p === "gfg") {
     return (
       <div
-        className={`shrink-0 flex items-center justify-center rounded-xl bg-[#F0FDF4] border border-[#DCFCE7] p-1 shadow-sm ${className}`}
+        className={`shrink-0 flex items-center justify-center ${rounded} bg-[#F0FDF4] border border-[#DCFCE7] ${padSm} shadow-2xs ${className}`}
         style={{ width: size, height: size }}
       >
         <img
           src="https://www.google.com/s2/favicons?domain=geeksforgeeks.org&sz=128"
           alt="GeeksforGeeks logo"
-          className="w-full h-full object-contain rounded-lg"
+          className="w-full h-full object-contain rounded-xs"
         />
       </div>
     );
@@ -357,7 +364,7 @@ export function PlatformLogo({
   if (p === "hackerrank") {
     return (
       <div
-        className={`shrink-0 flex items-center justify-center rounded-xl bg-[#00EA64] p-1 shadow-sm ${className}`}
+        className={`shrink-0 flex items-center justify-center ${rounded} bg-[#00EA64] ${padSm} shadow-2xs ${className}`}
         style={{ width: size, height: size }}
       >
         <svg viewBox="0 0 24 24" className="w-full h-full p-0.5" fill="none">
@@ -370,13 +377,13 @@ export function PlatformLogo({
   if (p === "codechef") {
     return (
       <div
-        className={`shrink-0 flex items-center justify-center rounded-xl bg-[#FDF8F6] border border-[#F5E6E0] p-1 shadow-sm ${className}`}
+        className={`shrink-0 flex items-center justify-center ${rounded} bg-[#FDF8F6] border border-[#F5E6E0] ${padSm} shadow-2xs ${className}`}
         style={{ width: size, height: size }}
       >
         <img
           src="https://www.google.com/s2/favicons?domain=codechef.com&sz=128"
           alt="CodeChef logo"
-          className="w-full h-full object-contain rounded-lg"
+          className="w-full h-full object-contain rounded-xs"
         />
       </div>
     );
