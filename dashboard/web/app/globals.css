@@ -10,7 +10,7 @@
 @source "../lib/**/*.{js,ts,jsx,tsx}";
 
 :root {
-  --sidebar-width: 216px;
+  --sidebar-width: 224px;
   --navbar-height: 56px;
 }
 
