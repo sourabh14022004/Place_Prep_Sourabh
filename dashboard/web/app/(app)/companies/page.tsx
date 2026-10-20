@@ -80,11 +80,18 @@ function CompaniesPageInner() {
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
-  const filtered = allCompanies.filter((c) => {
-    const matchesFilter = activeFilter === "All" || categoryMatch(c).includes(activeFilter);
-    const matchesSearch = !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const filtered = allCompanies
+    .filter((c) => {
+      const matchesFilter = activeFilter === "All" || categoryMatch(c).includes(activeFilter);
+      const matchesSearch = !search.trim() || c.name.toLowerCase().includes(search.trim().toLowerCase());
+      return matchesFilter && matchesSearch;
+    })
+    .sort((a, b) => {
+      const countA = a.questionCount ?? a.questions ?? 0;
+      const countB = b.questionCount ?? b.questions ?? 0;
+      if (countB !== countA) return countB - countA;
+      return a.name.localeCompare(b.name);
+    });
 
   const handleAddClick = (co: Company, inRoadmap: boolean) => {
     if (inRoadmap) return;
