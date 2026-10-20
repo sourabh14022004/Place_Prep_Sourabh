@@ -10,6 +10,14 @@ export const studentRepository = {
     return StudentProfile.findOne({ userId: new mongoose.Types.ObjectId(userId) }).lean<IStudentProfile>();
   },
 
+  async findByIdOrUserId(id: string): Promise<IStudentProfile | null> {
+    if (!mongoose.Types.ObjectId.isValid(id)) return null;
+    const objId = new mongoose.Types.ObjectId(id);
+    return StudentProfile.findOne({
+      $or: [{ userId: objId }, { _id: objId }],
+    }).lean<IStudentProfile>();
+  },
+
   async create(data: Partial<IStudentProfile>): Promise<IStudentProfile> {
     const profile = new StudentProfile(data);
     return profile.save() as unknown as IStudentProfile;

@@ -4,6 +4,7 @@
 
 import Company, { ICompany } from '../models/Company';
 import Question from '../models/Question';
+import { ROLE_DEFAULT_TOPICS } from '../constants/roles';
 
 // Pipeline stage that joins questions to count per company
 // Returns documents with an extra `questionCount` field
@@ -73,10 +74,12 @@ export const companyRepository = {
     ]);
 
     const countBySlug = new Map(counts.map(c => [c._id, c.count]));
-    return companies.map(c => ({
-      ...c,
-      questionCount: countBySlug.get(c.slug) ?? 0,
-    }));
+    return companies
+      .map(c => ({
+        ...c,
+        questionCount: countBySlug.get(c.slug) ?? 0,
+      }))
+      .sort((a, b) => (b.questionCount - a.questionCount) || a.name.localeCompare(b.name));
   },
 
   async findBySlug(slug: string): Promise<(ICompany & { questionCount: number }) | null> {
@@ -139,14 +142,48 @@ export const companyRepository = {
     const company = await Company.findOne({ slug: slug.toLowerCase() })
       .select('roleTopicFrequency topicFrequency')
       .lean<ICompany>();
-    if (!company) return [];
+    if (!company) {
+      return ROLE_DEFAULT_TOPICS[roleName] || [];
+    }
 
     const roleEntry = (company.roleTopicFrequency ?? []).find(r => r.roleName === roleName);
     if (roleEntry?.topics?.length) {
+      if (roleName === 'SDE-2' && !roleEntry.topics.some(t => /design|lld|hld|system/i.test(t.topicName))) {
+        return [
+          { topicSlug: 'system-design-hld', topicName: 'System Design (HLD)', frequencyPct: 25, questionCount: 10, roundType: 'System Design' },
+          { topicSlug: 'low-level-design', topicName: 'Low-Level Design (LLD & Patterns)', frequencyPct: 20, questionCount: 8, roundType: 'LLD' },
+          ...roleEntry.topics.slice(0, 4),
+        ];
+      }
+      if (roleName === 'SDE-3' && !roleEntry.topics.some(t => /distributed|system|architecture|scale/i.test(t.topicName))) {
+        return [
+          { topicSlug: 'distributed-systems', topicName: 'Distributed Systems & Scalability', frequencyPct: 25, questionCount: 10, roundType: 'System Design' },
+          { topicSlug: 'microservices-messaging', topicName: 'Microservices & Event Streaming', frequencyPct: 20, questionCount: 8, roundType: 'System Design' },
+          ...roleEntry.topics.slice(0, 4),
+        ];
+      }
+      if (roleName === 'ML Engineer' && !roleEntry.topics.some(t => /machine|learning|ml|deep|model/i.test(t.topicName))) {
+        return ROLE_DEFAULT_TOPICS['ML Engineer'];
+      }
       return roleEntry.topics;
     }
 
-    // Fallback: use flat topicFrequency mapped to the same shape
+    // If company has no role-specific questions for this role, return curated role topics
+    // (for SDE-1, if company has DSA topicFrequency, fallback to company topicFrequency)
+    if (roleName === 'SDE-1' && company.topicFrequency?.length) {
+      return company.topicFrequency.map(t => ({
+        topicSlug: t.topicSlug,
+        topicName: t.topicName,
+        frequencyPct: t.frequencyPct,
+        questionCount: t.questionCount,
+      }));
+    }
+
+    if (ROLE_DEFAULT_TOPICS[roleName]?.length) {
+      return ROLE_DEFAULT_TOPICS[roleName];
+    }
+
+    // Ultimate fallback: use flat topicFrequency mapped to the same shape
     return (company.topicFrequency ?? []).map(t => ({
       topicSlug: t.topicSlug,
       topicName: t.topicName,

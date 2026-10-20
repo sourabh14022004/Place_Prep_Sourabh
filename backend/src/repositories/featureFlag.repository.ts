@@ -30,6 +30,7 @@ export const featureFlagRepository = {
         update: {
           $setOnInsert: { ...d, enabled: true },
         },
+        upsert: true,
       },
     }));
     if (ops.length) await FeatureFlag.bulkWrite(ops, { ordered: false });
@@ -39,7 +40,7 @@ export const featureFlagRepository = {
     return FeatureFlag.findOneAndUpdate(
       { key },
       { $set: { enabled } },
-      { new: true, lean: true }
+      { new: true, upsert: true, lean: true }
     ).lean<IFeatureFlag | null>();
   },
 

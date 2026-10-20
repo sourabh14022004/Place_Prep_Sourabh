@@ -15,6 +15,20 @@ export const roadmapRepository = {
       .lean<IUserRoadmap[]>();
   },
 
+  async countManyByStudentIds(studentIds: string[]): Promise<Record<string, number>> {
+    if (!studentIds.length) return {};
+    const objectIds = studentIds.map((id) => new mongoose.Types.ObjectId(id));
+    const results = await UserRoadmap.aggregate([
+      { $match: { studentId: { $in: objectIds }, isActive: true } },
+      { $group: { _id: '$studentId', count: { $sum: 1 } } },
+    ]);
+    const map: Record<string, number> = {};
+    for (const r of results) {
+      map[r._id.toString()] = r.count;
+    }
+    return map;
+  },
+
   async findById(id: string): Promise<IUserRoadmap | null> {
     if (!mongoose.isValidObjectId(id)) return null;
     return UserRoadmap.findById(id).lean<IUserRoadmap>();
