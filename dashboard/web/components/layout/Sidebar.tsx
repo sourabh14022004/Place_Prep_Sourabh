@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   House, Building2, TrendingUp, Trophy, Send,
   MessageCircle, CalendarDays, Map, Dumbbell, LogOut,
-  PanelLeftClose, PanelLeftOpen, X, Bell,
+  PanelLeftClose, X, Bell,
 } from "lucide-react";
 
 import { useNavbar } from "@/lib/navbar-context";
@@ -56,17 +56,15 @@ export default function Sidebar() {
   const collapsed = isSidebarCollapsed;
 
   const getLinkClasses = (active: boolean) => {
-    const base = "flex items-center text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+    const base = "group relative flex items-center text-sm font-medium transition-all duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl";
     if (collapsed) {
-      // On desktop collapsed: neat centered 40x40 icon button
-      // On mobile: full width drawer link with label
-      return `${base} lg:w-10 lg:h-10 lg:mx-auto lg:justify-center lg:px-0 lg:py-0 w-full gap-3 px-3 py-2.5 rounded-xl ${
+      return `${base} lg:w-10 lg:h-10 lg:mx-auto lg:justify-center lg:px-0 lg:py-0 lg:gap-0 w-full gap-3 px-3 py-2.5 ${
         active
           ? "bg-blue-50 text-blue-700 font-semibold ring-1 ring-blue-100/80"
           : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       }`;
     }
-    return `${base} w-full gap-3 px-3 py-2.5 rounded-xl ${
+    return `${base} w-full gap-3 px-3 py-2.5 ${
       active
         ? "bg-blue-50 text-blue-700 font-semibold ring-1 ring-blue-100/80"
         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -75,16 +73,16 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile overlay */}
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden transition-opacity"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+      {/* Mobile overlay with smooth fade */}
+      <div
+        className={`fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden transition-opacity duration-300 ease-in-out ${
+          isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setMobileMenuOpen(false)}
+      />
 
       <aside
-        className={`fixed left-0 top-0 lg:top-14 bottom-0 bg-white border-r border-gray-200 flex flex-col z-50 transition-all duration-200 w-[260px] ${
+        className={`fixed left-0 top-0 lg:top-14 bottom-0 bg-white border-r border-gray-200 flex flex-col z-50 transition-[width,transform] duration-300 ease-in-out w-[260px] ${
           collapsed ? "lg:w-[68px]" : "lg:w-[224px]"
         } ${
           isMobileMenuOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
@@ -93,7 +91,7 @@ export default function Sidebar() {
         {/* Mobile-only drawer header with close button */}
         <div className="flex items-center justify-between px-4 h-14 border-b border-gray-100 lg:hidden shrink-0">
           <div className="flex items-center gap-2">
-            <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs">
+            <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs shadow-xs">
               NST
             </div>
             <span className="font-bold text-gray-900 text-sm tracking-tight">
@@ -110,7 +108,7 @@ export default function Sidebar() {
         </div>
 
         {/* Scrollable Navigation */}
-        <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-1 ${collapsed ? "lg:px-2 px-3" : "px-3"}`}>
+        <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-1 transition-all duration-300 ${collapsed ? "lg:px-2 px-3" : "px-3"}`}>
           {visibleNav.map(({ icon: Icon, label, href }) => {
             const active = isActive(href);
             return (
@@ -121,12 +119,20 @@ export default function Sidebar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className={getLinkClasses(active)}
               >
-                <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    active ? "text-blue-600" : "text-gray-400"
+                <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                  <Icon
+                    className={`w-4 h-4 ${
+                      active ? "text-blue-600" : "text-gray-400 group-hover:text-gray-600"
+                    }`}
+                  />
+                </div>
+                <span
+                  className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out origin-left ${
+                    collapsed
+                      ? "lg:max-w-0 lg:opacity-0 lg:scale-95 lg:w-0"
+                      : "max-w-[140px] opacity-100 scale-100"
                   }`}
-                />
-                <span className={collapsed ? "lg:hidden truncate" : "truncate"}>
+                >
                   {label}
                 </span>
               </Link>
@@ -135,10 +141,10 @@ export default function Sidebar() {
 
           {/* Faculty Connect Section */}
           {visibleConnect.length > 0 && (
-            <div className="mt-5 pt-3 border-t border-gray-100">
+            <div className={`mt-5 pt-3 border-t border-gray-100 transition-all duration-300 ${collapsed ? "lg:mt-3 lg:pt-2" : ""}`}>
               <p
-                className={`px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest ${
-                  collapsed ? "lg:hidden block" : "block"
+                className={`px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
+                  collapsed ? "lg:max-w-0 lg:opacity-0 lg:mb-0 lg:w-0" : "max-w-[140px] opacity-100 block"
                 }`}
               >
                 Faculty Connect
@@ -156,12 +162,18 @@ export default function Sidebar() {
                         active ? "!bg-indigo-50 !text-indigo-600 !ring-indigo-100/80" : ""
                       }`}
                     >
-                      <Icon
-                        className={`w-4 h-4 shrink-0 transition-colors ${
-                          active ? "text-indigo-600" : "text-gray-400"
+                      <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                        <Icon
+                          className={`w-4 h-4 ${
+                            active ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-600"
+                          }`}
+                        />
+                      </div>
+                      <span
+                        className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out origin-left ${
+                          collapsed ? "lg:max-w-0 lg:opacity-0 lg:scale-95 lg:w-0" : "max-w-[140px] opacity-100 scale-100"
                         }`}
-                      />
-                      <span className={collapsed ? "lg:hidden truncate" : "truncate"}>
+                      >
                         {label}
                       </span>
                     </Link>
@@ -173,26 +185,28 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer actions */}
-        <div className={`border-t border-gray-100 py-3 ${collapsed ? "lg:px-2 px-3" : "px-3"} space-y-1`}>
+        <div className={`border-t border-gray-100 py-3 transition-all duration-300 ${collapsed ? "lg:px-2 px-3" : "px-3"} space-y-1`}>
           {/* Collapse toggle — desktop only */}
           <button
             onClick={() => setSidebarCollapsed(!collapsed)}
-            className={`hidden lg:flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+            className={`hidden lg:flex items-center rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
               collapsed
-                ? "w-10 h-10 mx-auto justify-center"
+                ? "w-10 h-10 mx-auto justify-center px-0 py-0 gap-0"
                 : "w-full gap-3 px-3 py-2 text-left"
             }`}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed ? (
-              <PanelLeftOpen className="w-4 h-4 shrink-0" />
-            ) : (
-              <>
-                <PanelLeftClose className="w-4 h-4 shrink-0" />
-                <span className="truncate">Collapse</span>
-              </>
-            )}
+            <div className={`w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}>
+              <PanelLeftClose className="w-4 h-4" />
+            </div>
+            <span
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out origin-left ${
+                collapsed ? "max-w-0 opacity-0 scale-95 w-0" : "max-w-[140px] opacity-100 scale-100"
+              }`}
+            >
+              Collapse
+            </span>
           </button>
 
           {/* Mobile notifications button */}
@@ -212,15 +226,21 @@ export default function Sidebar() {
           {/* Logout button */}
           <button
             onClick={handleLogout}
-            className={`flex items-center rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${
+            className={`group flex items-center rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${
               collapsed
-                ? "lg:w-10 lg:h-10 lg:mx-auto lg:justify-center w-full gap-3 px-3 py-2.5 text-left"
+                ? "lg:w-10 lg:h-10 lg:mx-auto lg:justify-center lg:px-0 lg:py-0 lg:gap-0 w-full gap-3 px-3 py-2.5 text-left"
                 : "w-full gap-3 px-3 py-2.5 text-left"
             }`}
             title={collapsed ? "Logout" : undefined}
           >
-            <LogOut className="w-4 h-4 shrink-0" />
-            <span className={collapsed ? "lg:hidden truncate" : "truncate"}>
+            <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+              <LogOut className="w-4 h-4" />
+            </div>
+            <span
+              className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out origin-left ${
+                collapsed ? "lg:max-w-0 lg:opacity-0 lg:scale-95 lg:w-0" : "max-w-[140px] opacity-100 scale-100"
+              }`}
+            >
               Logout
             </span>
           </button>

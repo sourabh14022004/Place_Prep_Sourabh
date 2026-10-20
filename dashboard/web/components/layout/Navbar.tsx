@@ -34,16 +34,16 @@ export default function Navbar() {
       {/* Logo */}
       <Link
         href="/dashboard"
-        className={`flex items-center gap-2 shrink-0 transition-all ${
+        className={`flex items-center gap-2 shrink-0 transition-[width] duration-300 ease-in-out ${
           isSidebarCollapsed ? "lg:w-[68px] lg:justify-center" : "lg:w-[224px]"
         }`}
       >
-        <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs shrink-0">
+        <div className="bg-gradient-to-br from-blue-700 to-indigo-600 rounded-lg px-2 py-1 text-white font-bold text-xs shrink-0 transition-transform duration-200 hover:scale-105 shadow-xs">
           NST
         </div>
         <span
-          className={`font-bold text-gray-900 text-sm tracking-tight ${
-            isSidebarCollapsed ? "lg:hidden" : ""
+          className={`font-bold text-gray-900 text-sm tracking-tight overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out origin-left ${
+            isSidebarCollapsed ? "lg:max-w-0 lg:opacity-0" : "max-w-[140px] opacity-100"
           }`}
         >
           Place<span className="text-blue-600">Prep</span>

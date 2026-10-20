@@ -57,8 +57,8 @@ export default async function AppLayout({
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <Sidebar />
-        <main className="min-h-screen bg-gray-50 lg:ml-[var(--sidebar-width)] pt-7 transition-all duration-200">
-          <div className="px-4 lg:px-6 pb-6">{children}</div>
+        <main className="min-h-screen bg-gray-50 lg:ml-[224px] pt-14 transition-all duration-200">
+          <div className="px-4 lg:px-6 py-6">{children}</div>
         </main>
       </div>
     </FacultyProvider>

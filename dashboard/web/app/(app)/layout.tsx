@@ -15,7 +15,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <Navbar />
       <Sidebar />
       <main
-        className={`min-h-screen pt-14 transition-all duration-200 ${
+        className={`min-h-screen pt-14 transition-[margin] duration-300 ease-in-out ${
           isSidebarCollapsed ? "lg:ml-[68px]" : "lg:ml-[224px]"
         }`}
       >
