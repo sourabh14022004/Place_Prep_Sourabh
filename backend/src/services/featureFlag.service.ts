@@ -8,7 +8,7 @@
  */
 
 import { featureFlagRepository, FeatureFlagDefinition } from '../repositories/featureFlag.repository';
-import { IFeatureFlag } from '../models/FeatureFlag';
+import FeatureFlag, { IFeatureFlag } from '../models/FeatureFlag';
 import { ApiError } from '../utils/apiError';
 
 /**
@@ -187,6 +187,7 @@ export const featureFlagService = {
   async getRegistryState(): Promise<
     (FeatureFlagDefinition & { _id?: string; enabled: boolean; updatedAt?: Date })[]
   > {
+    await featureFlagRepository.upsertMany(DEFAULT_FEATURES);
     const docs = await featureFlagRepository.findAll();
     const byKey = new Map(docs.map((d) => [d.key, d]));
     return DEFAULT_FEATURES.map((def) => {
@@ -228,11 +229,30 @@ export const featureFlagService = {
   },
 
   async setMany(updates: { key: string; enabled: boolean }[]): Promise<Record<string, boolean>> {
-    const validKeys = new Set(DEFAULT_FEATURES.map((d) => d.key));
-    for (const u of updates) {
-      if (!validKeys.has(u.key)) continue; // silently ignore unknown keys
-      if (typeof u.enabled !== 'boolean') continue;
-      await featureFlagRepository.setEnabled(u.key, u.enabled);
+    const validDefs = new Map(DEFAULT_FEATURES.map((d) => [d.key, d]));
+    const ops = updates
+      .filter((u) => validDefs.has(u.key) && typeof u.enabled === 'boolean')
+      .map((u) => {
+        const def = validDefs.get(u.key)!;
+        return {
+          updateOne: {
+            filter: { key: u.key },
+            update: {
+              $set: { enabled: u.enabled },
+              $setOnInsert: {
+                portal: def.portal,
+                label: def.label,
+                description: def.description,
+                group: def.group,
+              },
+            },
+            upsert: true,
+          },
+        };
+      });
+
+    if (ops.length > 0) {
+      await FeatureFlag.bulkWrite(ops, { ordered: false });
     }
     invalidateCache();
     return this.getMap();

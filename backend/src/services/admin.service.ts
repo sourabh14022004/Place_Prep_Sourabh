@@ -15,6 +15,8 @@ import { companyRepository } from '../repositories/company.repository';
 import { authService } from './auth.service';
 import { ApiError } from '../utils/apiError';
 import { sanitizeAndLimit } from '../utils/sanitize';
+import mongoose from 'mongoose';
+import QuestionCompletion from '../models/QuestionCompletion';
 import type { IStudentProfile } from '../models/StudentProfile';
 import type { IFacultyProfile } from '../models/FacultyProfile';
 import type { DoubtTag as DoubtDomain } from '../types/shared.types';
@@ -144,26 +146,31 @@ export const adminService = {
     // PERF FIX: Replace N individual countDocuments with two bulk $in+$group aggregations.
     // Previously: 2N concurrent queries for limit=100 → 200 DB ops
     // Now: 2 aggregation queries regardless of page size
-    const [doubtCountMap, sessionCountMap] = await Promise.all([
+    const [doubtCountMap, sessionCountMap, roadmapCountMap] = await Promise.all([
       doubtRepository.countManyByStudentIds(userIds),
       sessionRepository.countManyByStudentIds(userIds),
+      roadmapRepository.countManyByStudentIds(userIds),
     ]);
 
     const enriched = profiles.map((p) => {
       const user = userMap.get(p.userId.toString());
       const uid  = p.userId.toString();
       return {
-        id:       p._id.toString(),
-        userId:   uid,
-        name:     p.fullName,
-        email:    user?.email,
-        batch:    p.batch,
-        branch:   p.branch,
-        progress: Math.min(Math.round((p.xpTotal || 0) / 20), 100),
-        doubts:   doubtCountMap[uid]   ?? 0,
-        sessions: sessionCountMap[uid] ?? 0,
-        status:   p.placementStatus,
-        xpTotal:  p.xpTotal,
+        id:                 p._id.toString(),
+        userId:             uid,
+        name:               p.fullName,
+        email:              user?.email,
+        batch:              p.batch,
+        branch:             p.branch,
+        progress:           Math.min(Math.round((p.xpTotal || 0) / 20), 100),
+        doubts:             doubtCountMap[uid]   ?? 0,
+        sessions:           sessionCountMap[uid] ?? 0,
+        roadmapsCount:      roadmapCountMap[uid] ?? 0,
+        currentStreakDays:  p.currentStreakDays  ?? 0,
+        status:             p.placementStatus,
+        xpTotal:            p.xpTotal            ?? 0,
+        platformHandles:    p.platformHandles    ?? {},
+        targetCompanySlugs: p.targetCompanySlugs ?? [],
       };
     });
 
@@ -171,25 +178,67 @@ export const adminService = {
   },
 
   /**
-   * Get single student detail with roadmaps, doubts, session counts.
+   * Get single student detail with roadmaps, doubts, session counts, problems solved.
    */
-  async getStudentDetail(userId: string) {
-    const profile = await studentRepository.findByUserId(userId);
+  async getStudentDetail(identifier: string) {
+    const profile = await studentRepository.findByIdOrUserId(identifier);
     if (!profile) throw ApiError.notFound('Student');
+    const userId = profile.userId.toString();
 
-    const [user, roadmaps, { total: totalDoubts }, sessionCount] = await Promise.all([
+    const [user, roadmaps, doubtsResult, sessions, problemsSolved] = await Promise.all([
       userRepository.findById(userId),
       roadmapRepository.findByStudentId(userId),
-      doubtRepository.findByStudentId(userId, 1, 1),
-      sessionRepository.countByStudentId(userId),
+      doubtRepository.findByStudentId(userId, 1, 10),
+      sessionRepository.findByStudentId(userId),
+      QuestionCompletion.countDocuments({
+        studentId: new mongoose.Types.ObjectId(userId),
+        isSeeded: { $ne: true },
+      }),
     ]);
+
+    const formattedRoadmaps = (roadmaps || []).map((r: any) => {
+      const weeks = r.weeks || [];
+      const totalQuestions = weeks.reduce((acc: number, w: any) => acc + (w.totalQuestions || 0), 0);
+      const doneQuestions = weeks.reduce((acc: number, w: any) => acc + (w.doneQuestions || 0), 0);
+      const progressPct = totalQuestions > 0 ? Math.round((doneQuestions / totalQuestions) * 100) : 0;
+      return {
+        _id: r._id?.toString(),
+        title: r.title,
+        companySlug: r.companySlug,
+        companyName: r.companyName || r.title,
+        targetRole: r.targetRole,
+        totalWeeks: weeks.length,
+        totalQuestions,
+        doneQuestions,
+        progressPct,
+        status: r.status,
+        lastActive: r.lastActive,
+        weeks: weeks.map((w: any) => ({
+          weekNumber: w.weekNumber,
+          topicLabel: w.topicLabel,
+          totalQuestions: w.totalQuestions,
+          doneQuestions: w.doneQuestions,
+          status: w.status,
+        })),
+      };
+    });
+
+    const totalRoadmapQuestions = formattedRoadmaps.reduce((acc, r) => acc + r.totalQuestions, 0);
+    const totalDoneQuestions = formattedRoadmaps.reduce((acc, r) => acc + r.doneQuestions, 0);
+    const overallProgress = totalRoadmapQuestions > 0 ? Math.round((totalDoneQuestions / totalRoadmapQuestions) * 100) : 0;
 
     return {
       ...profile,
+      userId,
       email: user?.email,
-      roadmaps,
-      totalDoubts,
-      totalSessions: sessionCount,
+      roadmaps: formattedRoadmaps,
+      totalRoadmaps: formattedRoadmaps.length,
+      overallProgress,
+      totalDoubts: doubtsResult.total,
+      recentDoubts: doubtsResult.threads,
+      totalSessions: sessions.length,
+      recentSessions: sessions.slice(0, 10),
+      problemsSolved,
     };
   },
 

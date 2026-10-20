@@ -98,8 +98,13 @@ export const roadmapService = {
     const topTopics = scored.slice(0, prepWeeks);
     const topicNames = topTopics.map(t => t.topicName);
 
+    const roleTopicPool = roleTopics.map(t => t.topicName);
     while (topicNames.length < prepWeeks) {
-      topicNames.push(DEFAULT_TOPICS[topicNames.length % DEFAULT_TOPICS.length]);
+      if (roleTopicPool.length > 0) {
+        topicNames.push(roleTopicPool[topicNames.length % roleTopicPool.length]);
+      } else {
+        topicNames.push(DEFAULT_TOPICS[topicNames.length % DEFAULT_TOPICS.length]);
+      }
     }
 
     // Sequential (not parallel) so each week can exclude IDs already assigned to prior weeks.
