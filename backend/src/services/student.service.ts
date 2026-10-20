@@ -158,6 +158,20 @@ export const studentService = {
       for (const [k, v] of Object.entries(platformHandles as Record<string, string | null>)) {
         const clean = v ? extractHandle(v) : null;
         if (clean) {
+          // Enforce uniqueness: verify if another account has already connected this coding handle
+          const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const existing = await StudentProfile.findOne({
+            userId: { $ne: new mongoose.Types.ObjectId(userId) },
+            [`platformHandles.${k}`]: { $regex: new RegExp(`^${escapeRegex(clean)}$`, 'i') },
+          }).select('userId fullName');
+
+          if (existing) {
+            const platformName = k === 'leetcode' ? 'LeetCode' : k === 'codeforces' ? 'Codeforces' : k;
+            throw ApiError.conflict(
+              `This ${platformName} profile (@${clean}) is already connected to another account.`
+            );
+          }
+
           flatData[`platformHandles.${k}`] = clean;
         } else {
           // null means disconnect — unset the field
@@ -699,6 +713,7 @@ export const studentService = {
    * `search` (client-side filtering can't find anyone outside the top 100).
    */
   async getLeaderboard(batch?: string, period?: string, search?: string) {
+    const normalizedBatch = batch && batch.toLowerCase() !== 'all' ? batch : undefined;
     let sinceDate: Date | undefined;
     if (period === 'this-week') sinceDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     else if (period === 'this-month') sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -722,17 +737,29 @@ export const studentService = {
         { $group: { _id: '$studentId', score: { $sum: 1 }, lastActivity: { $max: '$completedAt' } } },
         { $lookup: { from: 'studentprofiles', localField: '_id', foreignField: 'userId', as: 'profile' } },
         { $unwind: '$profile' },
-        ...(batch ? [{ $match: { 'profile.batch': batch } }] : []),
+        ...(normalizedBatch ? [{ $match: { 'profile.batch': normalizedBatch } }] : []),
         ...(escapedSearch ? [{ $match: { 'profile.fullName': { $regex: escapedSearch, $options: 'i' } } }] : []),
         { $sort: { score: -1, lastActivity: -1 as const } },
         { $limit: 100 },
       ];
       const agg = await QuestionCompletion.aggregate(pipeline);
       rows = agg.map((r: any) => ({ profile: r.profile, score: r.score, lastActivity: r.lastActivity }));
+
+      // If no question completions in window, fallback to students ranked by XP
+      if (rows.length === 0) {
+        const filter: Record<string, unknown> = {};
+        if (normalizedBatch) filter.batch = normalizedBatch;
+        if (escapedSearch) filter.fullName = { $regex: escapedSearch, $options: 'i' };
+        const profiles = await StudentProfile.find(filter)
+          .sort({ xpTotal: -1 })
+          .limit(100)
+          .lean();
+        rows = profiles.map((p) => ({ profile: p }));
+      }
     } else {
       // All-time XP ranking with optional search — single indexed query
       const filter: Record<string, unknown> = {};
-      if (batch) filter.batch = batch;
+      if (normalizedBatch) filter.batch = normalizedBatch;
       if (escapedSearch) filter.fullName = { $regex: escapedSearch, $options: 'i' };
       const profiles = await StudentProfile.find(filter)
         .sort({ xpTotal: -1 })
