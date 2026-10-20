@@ -20,7 +20,7 @@ const sections = [
     description: "The Overview page provides a high-level summary of the placement platform's daily activity.",
     bullets: [
       { bold: "KPI Metrics:", text: "View quick stats like Students on Roadmap, Doubts Raised, and Sessions Booked." },
-      { bold: "Live Monitor:", text: "Shows active users and server load in real-time." },
+      { bold: "Upcoming Sessions:", text: "Review scheduled mentor sessions, dates, and topics." },
       { bold: "Charts:", text: "Visual representations of placement rates and session volume over time." },
     ],
   },
