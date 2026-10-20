@@ -43,8 +43,11 @@ function SkeletonRow() {
 
 export default function LeaderboardPage() {
   const [batch, setBatch] = useState("All");
-  const [period, setPeriod] = useState("This Month");
-  const { leaderboard, isLoading } = useLeaderboard(batch.toLowerCase(), period.toLowerCase().replace(" ", "-"));
+  const [period, setPeriod] = useState("All Time");
+  const { leaderboard, isLoading } = useLeaderboard(
+    batch.toLowerCase(),
+    period.toLowerCase().replace(/\s+/g, "-")
+  );
 
   const entries = leaderboard as LeaderboardEntry[];
   const podium = entries.slice(0, 3);
@@ -93,34 +96,53 @@ export default function LeaderboardPage() {
         </div>
       </div>
 
-      {/* Podium (rank 1-3) */}
-      {isLoading ? (
-        <div className="grid grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-40 bg-gray-200 rounded-xl animate-pulse" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {podium.map((entry) => <PodiumCard key={entry.rank} entry={entry} />)}
+      {/* Empty State */}
+      {!isLoading && entries.length === 0 && (
+        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-12 text-center">
+          <Trophy className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+          <h3 className="text-sm font-semibold text-gray-700">No students on leaderboard</h3>
+          <p className="text-xs text-gray-400 mt-1">
+            {batch !== "All"
+              ? `No active students found in Batch ${batch}. Try selecting "All" batches.`
+              : "No students have accumulated XP yet."}
+          </p>
         </div>
       )}
 
-      {/* Ranks 4-10 */}
-      <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[32px_1fr_80px_80px_80px] gap-0 px-4 py-2 border-b border-gray-100">
-          <span className="text-[10px] font-semibold text-gray-400 uppercase">#</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase">Student</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">XP</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">Tasks</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">Doubts</span>
+      {/* Podium (rank 1-3) */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-40 bg-gray-200 rounded-xl animate-pulse" />
+          ))}
         </div>
-        <div className="divide-y divide-gray-50">
-          {isLoading
-            ? [...Array(7)].map((_, i) => (
+      ) : podium.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {podium.map((entry) => (
+            <PodiumCard key={entry.rank} entry={entry} />
+          ))}
+        </div>
+      ) : null}
+
+      {/* Ranks 4-10 or rest */}
+      {(isLoading || entries.length > 0) && (
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+          <div className="grid grid-cols-[32px_1fr_80px_80px_80px] gap-0 px-4 py-2 border-b border-gray-100">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase">#</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase">Student</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">XP</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">Tasks</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase text-right">Doubts</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {isLoading ? (
+              [...Array(7)].map((_, i) => (
                 <div key={i} className="px-4 py-2">
                   <SkeletonRow />
                 </div>
               ))
-            : rest.map((entry) => (
+            ) : rest.length > 0 ? (
+              rest.map((entry) => (
                 <div
                   key={entry.rank}
                   className="grid grid-cols-[32px_1fr_80px_80px_80px] gap-0 px-4 py-2.5 hover:bg-gray-50 transition-colors"
@@ -142,9 +164,15 @@ export default function LeaderboardPage() {
                   <span className="text-xs font-medium text-gray-700 self-center text-right">{entry.tasksCompleted}</span>
                   <span className="text-xs font-medium text-gray-500 self-center text-right">{entry.doubtsRaised}</span>
                 </div>
-              ))}
+              ))
+            ) : (
+              <div className="py-6 text-center text-xs text-gray-400">
+                All {podium.length} ranked student{podium.length === 1 ? "" : "s"} are displayed on the podium above.
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-[10px] text-gray-400">

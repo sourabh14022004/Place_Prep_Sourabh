@@ -118,12 +118,16 @@ export function usePlacementData() {
 }
 
 // ─── Leaderboard ─────────────────────────────────────────────────
-export function useLeaderboard(_batch = "all", _period = "monthly") {
+export function useLeaderboard(_batch = "all", _period = "all-time") {
+  const query = new URLSearchParams();
+  if (_batch && _batch.toLowerCase() !== "all") query.set("batch", _batch);
+  if (_period && _period.toLowerCase() !== "all-time") query.set("period", _period);
+  const qStr = query.toString();
   const { data, error, isLoading } = useSWR(
-    `/api/admin/leaderboard?batch=${_batch}&period=${_period}`,
+    `/api/admin/leaderboard${qStr ? `?${qStr}` : ""}`,
     fetcher
   );
-  const entries = data?.entries ?? data ?? [];
+  const entries = Array.isArray(data) ? data : (data?.entries ?? data?.data ?? []);
   return { leaderboard: Array.isArray(entries) ? entries : [], isLoading: isLoading && !error, isError: !!error };
 }
 

@@ -14,9 +14,12 @@ export async function GET(request: Request): Promise<Response> {
     await connectDB();
     await requireAdmin(request);
     const { searchParams } = new URL(request.url);
-    const batch = searchParams.get('batch') || undefined;
-    const period = searchParams.get('period') || undefined;
-    const leaderboard = await studentService.getLeaderboard(batch, period);
+    const rawBatch = searchParams.get('batch');
+    const batch = rawBatch && rawBatch.toLowerCase() !== 'all' ? rawBatch : undefined;
+    const rawPeriod = searchParams.get('period');
+    const period = rawPeriod && rawPeriod.toLowerCase() !== 'all-time' ? rawPeriod : undefined;
+    const search = searchParams.get('search') || undefined;
+    const leaderboard = await studentService.getLeaderboard(batch, period, search);
     return successResponse(leaderboard);
   } catch (error) {
     return handleApiError(error);

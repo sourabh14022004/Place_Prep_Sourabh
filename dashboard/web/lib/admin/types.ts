@@ -1,16 +1,26 @@
 // ─── Existing Types ───────────────────────────────────────────────
 
 export interface Student {
-  id: number;
+  id: string | number;
+  userId?: string;
   name: string;
   fullName?: string;   // backend returns fullName; name is kept as fallback
   batch: string;
+  branch?: string;
   progress: number;
   doubts: number;
   sessions: number;
+  roadmapsCount?: number;
+  currentStreakDays?: number;
   status: "PLACED" | "IN PROGRESS" | "INACTIVE";
   email?: string;
   phone?: string;
+  xpTotal?: number;
+  platformHandles?: {
+    leetcode?: string;
+    codeforces?: string;
+  };
+  targetCompanySlugs?: string[];
 }
 
 export interface Faculty {
