@@ -21,8 +21,9 @@ import {
   followRoadmap, unfollowRoadmap, useCustomRoadmap,
 } from "@/lib/customRoadmaps";
 import { CompanyLogo, CompanyLogoStack } from "@/components/ui";
+import { FeatureGate } from "@/lib/features";
 
-export default function CustomRoadmapDetailPage({
+function CustomRoadmapDetailPageInner({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -320,5 +321,18 @@ export default function CustomRoadmapDetailPage({
         })}
       </div>
     </div>
+  );
+}
+
+// Admin feature-toggle gate (Feature Controls → student.roadmap)
+export default function CustomRoadmapDetailPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  return (
+    <FeatureGate feature="student.roadmap" title="My Roadmap">
+      <CustomRoadmapDetailPageInner params={params} />
+    </FeatureGate>
   );
 }

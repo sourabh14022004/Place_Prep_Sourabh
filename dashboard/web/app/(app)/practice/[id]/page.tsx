@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useQuestion, useCompletedQuestions, completeQuestion, usePlatformProfiles } from "@/lib/hooks";
 import { getPracticeUrl, getPlatformInfo } from "@/lib/constants";
 import { mutate as globalMutate } from "swr";
+import { FeatureGate } from "@/lib/features";
 
 // ── Platform badge colours ────────────────────────────────────────────────
 const PLATFORM_COLORS: Record<string, { bg: string; text: string; abbr: string }> = {
@@ -58,7 +59,7 @@ function Section({ title, icon: Icon, children, defaultOpen = false }: {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────
-export default function QuestionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function QuestionDetailPageInner({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { data: question, isLoading, error } = useQuestion(id);
@@ -684,5 +685,14 @@ export default function QuestionDetailPage({ params }: { params: Promise<{ id: s
         </div>
       )}
     </div>
+  );
+}
+
+// Admin feature-toggle gate (Feature Controls → student.practice)
+export default function QuestionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <FeatureGate feature="student.practice" title="Practice Zone">
+      <QuestionDetailPageInner params={params} />
+    </FeatureGate>
   );
 }

@@ -459,9 +459,9 @@ function CompanyPageInner({ params }: { params: Promise<{ name: string }> }) {
 
       {/* ── Overview Tab ─────────────────────────────────────────── */}
       {activeTab === "Overview" && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-4">
           {/* Round structure */}
-          <div className="col-span-3 bg-white border border-gray-200 rounded-xl p-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Standard Round Structure</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {intel.roundStructure.map((r: any) => (
@@ -482,120 +482,133 @@ function CompanyPageInner({ params }: { params: Promise<{ name: string }> }) {
             </div>
           </div>
 
-          {/* Interview DNA */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-semibold text-gray-900 mb-4">Interview DNA</h3>
-            {intel.interviewDNA.segments.length === 0 ? (
-              <p className="text-xs text-gray-400 py-4 text-center">
-                No verified round-structure data for this company yet.
-              </p>
-            ) : (
-              <>
-            <div className="h-6 rounded-full overflow-hidden flex mb-3">
-              {intel.interviewDNA.segments.map((segment) => (
-                <div
-                  key={segment.label}
-                  className={`${segment.color} flex items-center justify-center text-white text-xs font-medium`}
-                  style={{ width: `${segment.pct}%` }}
-                >
-                  {segment.pct >= 12 ? `${segment.pct}%` : ''}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              {intel.interviewDNA.segments.map((segment) => (
-                <div key={segment.label} className="flex items-center gap-1.5">
-                  <div className={`w-2.5 h-2.5 rounded-sm ${segment.color}`} />
-                  <span className="text-gray-600">{segment.label} ({segment.pct}%)</span>
-                </div>
-              ))}
-            </div>
-            {intel.interviewDNA.estimated && (
-              <p className="mt-3 text-xs text-gray-400">
-                Estimated from question frequency in this dataset — not verified interview-round data.
-              </p>
-            )}
-              </>
-            )}
-          </div>
-
-          {/* Top Topics */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-semibold text-gray-900 mb-4">Top Topics</h3>
-            <div className="space-y-2.5">
-              {intel.topTopics.map((t: any) => (
-                <div key={t.topic}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-700">{t.topic}</span>
-                    <span className="text-gray-500">{t.pct}%</span>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full">
-                    <div
-                      className="h-2 bg-blue-500 rounded-full"
-                      style={{ width: `${Math.min(t.pct, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Difficulty Donut — BUG-C3 FIX: computed from intel.difficultyBreakdown (real DB data) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-semibold text-gray-900 mb-4">Question Difficulty</h3>
-            {(() => {
-              const breakdown = intel.difficultyBreakdown;
-              const circumference = 2 * Math.PI * 35; // r=35
-              // Sort: Easy, Medium, Hard
-              const order = ['Easy', 'Medium', 'Hard'];
-              const sorted = order.map(name => breakdown.find((d: any) => d.name === name) || { name, value: 0, color: '#E5E7EB' });
-              const total = sorted.reduce((s, d) => s + d.value, 0);
-              let offset = 0;
-              const segments = sorted.map(d => {
-                const dash = total > 0 ? (d.value / total) * circumference : 0;
-                const gap  = circumference - dash;
-                const seg  = { ...d, dash, gap, offset };
-                offset += dash;
-                return seg;
-              });
-              // Find majority label
-              const majority = total > 0 ? sorted.reduce((a, b) => a.value >= b.value ? a : b).name : 'N/A';
-              return (
-                <div className="flex items-center justify-center">
-                  <div className="relative w-28 h-28">
-                    <svg viewBox="0 0 100 100" className="w-28 h-28 -rotate-90">
-                      {segments.map(seg => seg.dash > 0 && (
-                        <circle
-                          key={seg.name}
-                          cx="50" cy="50" r="35"
-                          fill="none"
-                          stroke={seg.color}
-                          strokeWidth="18"
-                          strokeDasharray={`${seg.dash.toFixed(2)} ${seg.gap.toFixed(2)}`}
-                          strokeDashoffset={`-${seg.offset.toFixed(2)}`}
-                        />
+          {/* Interview DNA & Question Difficulty together */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Interview DNA */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-4">Interview DNA</h3>
+                {intel.interviewDNA.segments.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-6 text-center">
+                    No verified round-structure data for this company yet.
+                  </p>
+                ) : (
+                  <>
+                    <div className="h-6 rounded-full overflow-hidden flex mb-3">
+                      {intel.interviewDNA.segments.map((segment) => (
+                        <div
+                          key={segment.label}
+                          className={`${segment.color} flex items-center justify-center text-white text-xs font-medium`}
+                          style={{ width: `${segment.pct}%` }}
+                        >
+                          {segment.pct >= 12 ? `${segment.pct}%` : ''}
+                        </div>
                       ))}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-base font-bold text-gray-900">{majority}</span>
-                      <span className="text-xs text-gray-400">MAJORITY</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-xs">
+                      {intel.interviewDNA.segments.map((segment) => (
+                        <div key={segment.label} className="flex items-center gap-1.5">
+                          <div className={`w-2.5 h-2.5 rounded-sm ${segment.color}`} />
+                          <span className="text-gray-600">{segment.label} ({segment.pct}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {intel.interviewDNA.estimated && (
+                <p className="mt-3 text-xs text-gray-400">
+                  Estimated from question frequency in this dataset — not verified interview-round data.
+                </p>
+              )}
+            </div>
+
+            {/* Question Difficulty */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col justify-between">
+              <h3 className="font-semibold text-gray-900 mb-4">Question Difficulty</h3>
+              {(() => {
+                const breakdown = intel.difficultyBreakdown;
+                const circumference = 2 * Math.PI * 35; // r=35
+                // Sort: Easy, Medium, Hard
+                const order = ['Easy', 'Medium', 'Hard'];
+                const sorted = order.map(name => breakdown.find((d: any) => d.name === name) || { name, value: 0, color: '#E5E7EB' });
+                const total = sorted.reduce((s, d) => s + d.value, 0);
+                let offset = 0;
+                const segments = sorted.map(d => {
+                  const dash = total > 0 ? (d.value / total) * circumference : 0;
+                  const gap  = circumference - dash;
+                  const seg  = { ...d, dash, gap, offset };
+                  offset += dash;
+                  return seg;
+                });
+                // Find majority label
+                const majority = total > 0 ? sorted.reduce((a, b) => a.value >= b.value ? a : b).name : 'N/A';
+                return (
+                  <div className="flex items-center justify-center py-1">
+                    <div className="relative w-28 h-28">
+                      <svg viewBox="0 0 100 100" className="w-28 h-28 -rotate-90">
+                        {segments.map(seg => seg.dash > 0 && (
+                          <circle
+                            key={seg.name}
+                            cx="50" cy="50" r="35"
+                            fill="none"
+                            stroke={seg.color}
+                            strokeWidth="18"
+                            strokeDasharray={`${seg.dash.toFixed(2)} ${seg.gap.toFixed(2)}`}
+                            strokeDashoffset={`-${seg.offset.toFixed(2)}`}
+                          />
+                        ))}
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-base font-bold text-gray-900">{majority}</span>
+                        <span className="text-xs text-gray-400">MAJORITY</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })()}
-            <div className="flex justify-center gap-4 mt-3 text-xs">
-              {intel.difficultyBreakdown.map((d: any) => (
-                <div key={d.name} className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
-                  <span className="text-gray-600">{d.name} ({d.value}%)</span>
-                </div>
-              ))}
+                );
+              })()}
+              <div className="flex justify-center gap-4 mt-3 text-xs">
+                {intel.difficultyBreakdown.map((d: any) => (
+                  <div key={d.name} className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
+                    <span className="text-gray-600">{d.name} ({d.value}%)</span>
+                  </div>
+                ))}
+              </div>
             </div>
+          </div>
+
+          {/* Top Topics — placed on the bottom of Interview DNA & Question Difficulty, horizontal layout, percentages only */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Top Topics</h3>
+              <span className="text-xs text-gray-500">By question frequency</span>
+            </div>
+            {intel.topTopics.length === 0 ? (
+              <p className="text-xs text-gray-400 py-4 text-center">
+                No topic data available for this company yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+                {intel.topTopics.map((t: any) => (
+                  <div
+                    key={t.topic}
+                    className="flex items-center justify-between px-3 py-2 bg-gray-50/80 hover:bg-blue-50/50 border border-gray-100 hover:border-blue-200 rounded-lg transition-colors group"
+                  >
+                    <span className="text-xs font-medium text-gray-700 group-hover:text-gray-900 truncate mr-2" title={t.topic}>
+                      {t.topic}
+                    </span>
+                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 group-hover:bg-blue-100/70 px-1.5 py-0.5 rounded shrink-0">
+                      {t.pct}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Sample Questions */}
-          <div className="col-span-3 bg-white border border-gray-200 rounded-xl p-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Sample Questions</h3>
               <button
