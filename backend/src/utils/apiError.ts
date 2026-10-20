@@ -103,6 +103,24 @@ export function handleApiError(error: unknown): Response {
     );
   }
 
+  // MongoDB duplicate key error (code 11000)
+  if ((error as any)?.code === 11000) {
+    const keyPattern = (error as any)?.keyPattern;
+    let message = 'This value is already in use by another account.';
+    if (keyPattern?.['platformHandles.leetcode']) {
+      message = 'This LeetCode profile is already connected to another account.';
+    } else if (keyPattern?.['platformHandles.codeforces']) {
+      message = 'This Codeforces profile is already connected to another account.';
+    }
+    return Response.json(
+      {
+        success: false,
+        error: { code: 'CONFLICT', message },
+      },
+      { status: 409 }
+    );
+  }
+
   // Unexpected errors — don't leak internals to the client, but do log them.
   console.error('[UNHANDLED_API_ERROR]', error);
   const isDev = process.env.NODE_ENV !== 'production';

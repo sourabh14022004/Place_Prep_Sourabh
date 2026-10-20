@@ -13,7 +13,6 @@ import { handleApiError } from '../../../utils/apiError';
 export async function GET(request: Request) {
   try {
     await connectDB();
-    await requireAuth(request);
     const map = await featureFlagService.getMap();
     const facultyMap = Object.fromEntries(
       Object.entries(map).filter(([key]) => key.startsWith('faculty.'))

@@ -129,6 +129,22 @@ const StudentProfileSchema = new Schema<IStudentProfile>(
 StudentProfileSchema.index({ batch: 1, placementStatus: 1 });
 StudentProfileSchema.index({ xpTotal: -1 }); // leaderboard queries
 StudentProfileSchema.index({ fullName: 'text' }); // search
+StudentProfileSchema.index(
+  { 'platformHandles.leetcode': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { 'platformHandles.leetcode': { $type: 'string' } },
+    collation: { locale: 'en', strength: 2 },
+  }
+);
+StudentProfileSchema.index(
+  { 'platformHandles.codeforces': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { 'platformHandles.codeforces': { $type: 'string' } },
+    collation: { locale: 'en', strength: 2 },
+  }
+);
 
 const StudentProfile: Model<IStudentProfile> =
   mongoose.models.StudentProfile ||
